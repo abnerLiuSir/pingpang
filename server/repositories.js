@@ -37,6 +37,55 @@ export function listPlayers(db) {
     .map(rowToPlayer);
 }
 
+export function listAllPlayers(db) {
+  return db
+    .prepare('SELECT id, name, rating, is_active FROM players ORDER BY is_active DESC, name ASC')
+    .all()
+    .map(rowToPlayer);
+}
+
+export function createPlayer(db, { name }) {
+  const trimmedName = String(name || '').trim();
+  if (!trimmedName) {
+    return { valid: false, message: 'Player name is required.' };
+  }
+
+  try {
+    const result = db.prepare('INSERT INTO players (name, rating, is_active) VALUES (?, 1500, 1)').run(trimmedName);
+    return { valid: true, player: getAnyPlayer(db, Number(result.lastInsertRowid)) };
+  } catch (error) {
+    if (String(error.message).includes('UNIQUE')) {
+      return { valid: false, message: 'Player name already exists.' };
+    }
+    throw error;
+  }
+}
+
+export function updatePlayer(db, id, { name, isActive }) {
+  const player = getAnyPlayer(db, id);
+  if (!player) {
+    return { valid: false, message: 'Player was not found.' };
+  }
+
+  const nextName = name === undefined ? player.name : String(name || '').trim();
+  if (!nextName) {
+    return { valid: false, message: 'Player name is required.' };
+  }
+
+  const nextActive = isActive === undefined ? player.isActive : Boolean(isActive);
+
+  try {
+    db.prepare('UPDATE players SET name = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(nextName, nextActive ? 1 : 0, Number(id));
+    return { valid: true, player: getAnyPlayer(db, id) };
+  } catch (error) {
+    if (String(error.message).includes('UNIQUE')) {
+      return { valid: false, message: 'Player name already exists.' };
+    }
+    throw error;
+  }
+}
+
 export function getPlayer(db, id) {
   const row = db
     .prepare('SELECT id, name, rating, is_active FROM players WHERE id = ? AND is_active = 1')
@@ -44,9 +93,17 @@ export function getPlayer(db, id) {
   return row ? rowToPlayer(row) : null;
 }
 
-export function previewMatch(db, { winnerId, loserId }) {
-  const winner = getPlayer(db, winnerId);
-  const loser = getPlayer(db, loserId);
+function getAnyPlayer(db, id) {
+  const row = db
+    .prepare('SELECT id, name, rating, is_active FROM players WHERE id = ?')
+    .get(Number(id));
+  return row ? rowToPlayer(row) : null;
+}
+
+export function previewMatch(db, { winnerId, loserId, includeInactive = false }) {
+  const findPlayer = includeInactive ? getAnyPlayer : getPlayer;
+  const winner = findPlayer(db, winnerId);
+  const loser = findPlayer(db, loserId);
 
   if (!winner || !loser) {
     return { valid: false, message: 'Selected players were not found.' };
@@ -100,12 +157,52 @@ export function createMatch(db, { winnerId, loserId, score, playedAt, note = '' 
       note || '',
     );
 
-    db.prepare('UPDATE players SET rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(preview.winnerRatingAfter, Number(winnerId));
-    db.prepare('UPDATE players SET rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(preview.loserRatingAfter, Number(loserId));
-
+    recalculateRatings(db);
     return getMatch(db, Number(result.lastInsertRowid));
+  });
+
+  return { valid: true, match };
+}
+
+export function updateMatch(db, id, { winnerId, loserId, score, playedAt, note = '' }) {
+  const existing = getMatch(db, id);
+  if (!existing || existing.isReverted) {
+    return { valid: false, message: 'Match was not found.' };
+  }
+
+  const preview = previewMatch(db, { winnerId, loserId, includeInactive: true });
+  if (!preview.valid) {
+    return preview;
+  }
+
+  const match = runInTransaction(db, () => {
+    db.prepare(`
+      UPDATE matches
+      SET played_at = ?,
+          winner_id = ?,
+          loser_id = ?,
+          score = ?,
+          note = ?
+      WHERE id = ?
+    `).run(playedAt, Number(winnerId), Number(loserId), score, note || '', Number(id));
+    recalculateRatings(db);
+    return getMatch(db, id);
+  });
+
+  return { valid: true, match };
+}
+
+export function softDeleteMatch(db, id) {
+  const existing = getMatch(db, id);
+  if (!existing || existing.isReverted) {
+    return { valid: false, message: 'Match was not found.' };
+  }
+
+  const match = runInTransaction(db, () => {
+    db.prepare('UPDATE matches SET is_reverted = 1, reverted_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(Number(id));
+    recalculateRatings(db);
+    return getMatch(db, id);
   });
 
   return { valid: true, match };
@@ -141,6 +238,20 @@ export function listRecentMatches(db, limit = 8) {
   `).all(limit).map(rowToMatch);
 }
 
+export function listAllMatches(db, limit = 100) {
+  return db.prepare(`
+    SELECT
+      m.*,
+      winner.name AS winner_name,
+      loser.name AS loser_name
+    FROM matches m
+    JOIN players winner ON winner.id = m.winner_id
+    JOIN players loser ON loser.id = m.loser_id
+    ORDER BY m.played_at DESC, m.created_at DESC, m.id DESC
+    LIMIT ?
+  `).all(limit).map(rowToMatch);
+}
+
 export function getMostRecentActiveMatch(db) {
   const row = db.prepare(`
     SELECT
@@ -167,12 +278,9 @@ export function revertMostRecentMatch(db, id) {
   }
 
   const reverted = runInTransaction(db, () => {
-    db.prepare('UPDATE players SET rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(match.winnerRatingBefore, match.winnerId);
-    db.prepare('UPDATE players SET rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(match.loserRatingBefore, match.loserId);
     db.prepare('UPDATE matches SET is_reverted = 1, reverted_at = CURRENT_TIMESTAMP WHERE id = ?')
       .run(match.id);
+    recalculateRatings(db);
     return getMatch(db, match.id);
   });
 
@@ -285,6 +393,50 @@ function getRecentForm(db, playerId) {
     ORDER BY created_at DESC, id DESC
     LIMIT 5
   `).all(playerId, playerId).map((row) => (row.winner_id === playerId ? 'W' : 'L'));
+}
+
+function recalculateRatings(db) {
+  const players = db.prepare('SELECT id FROM players').all();
+  const ratings = new Map(players.map((player) => [player.id, 1500]));
+  const matches = db.prepare(`
+    SELECT id, winner_id, loser_id
+    FROM matches
+    WHERE is_reverted = 0
+    ORDER BY played_at ASC, id ASC
+  `).all();
+
+  for (const match of matches) {
+    const winnerRating = ratings.get(match.winner_id) ?? 1500;
+    const loserRating = ratings.get(match.loser_id) ?? 1500;
+    const change = calculateRatingChange({ winnerRating, loserRating });
+
+    db.prepare(`
+      UPDATE matches
+      SET winner_rating_before = ?,
+          loser_rating_before = ?,
+          winner_rating_after = ?,
+          loser_rating_after = ?,
+          winner_delta = ?,
+          loser_delta = ?
+      WHERE id = ?
+    `).run(
+      winnerRating,
+      loserRating,
+      change.winnerRatingAfter,
+      change.loserRatingAfter,
+      change.winnerDelta,
+      change.loserDelta,
+      match.id,
+    );
+
+    ratings.set(match.winner_id, change.winnerRatingAfter);
+    ratings.set(match.loser_id, change.loserRatingAfter);
+  }
+
+  const updatePlayerRating = db.prepare('UPDATE players SET rating = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  for (const player of players) {
+    updatePlayerRating.run(ratings.get(player.id) ?? 1500, player.id);
+  }
 }
 
 function runInTransaction(db, callback) {

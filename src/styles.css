@@ -407,6 +407,10 @@ tbody tr:hover {
 }
 
 .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid var(--line-strong);
@@ -533,6 +537,10 @@ tbody tr:hover {
   text-align: left;
 }
 
+.global-message {
+  margin-bottom: 14px;
+}
+
 .preview-box {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -595,6 +603,99 @@ tbody tr:hover {
   font-size: 13px;
 }
 
+.inline-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.inline-form input,
+.manager-row input {
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 8px 10px;
+  outline: 0;
+}
+
+.manager-list {
+  display: grid;
+  gap: 8px;
+}
+
+.manager-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px 36px 58px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.manager-row.inactive {
+  background: var(--surface-strong);
+  color: var(--muted);
+}
+
+.player-rating {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.small-button {
+  min-height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.match-manager {
+  margin-top: 18px;
+}
+
+.match-admin-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.match-admin-card.deleted {
+  color: var(--muted);
+}
+
+.match-admin-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.match-admin-summary span,
+.match-admin-summary small {
+  color: var(--muted);
+}
+
+.match-admin-summary em {
+  color: var(--danger);
+  font-style: normal;
+  font-size: 13px;
+}
+
+.row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .icon-button {
   display: inline-flex;
   width: 36px;
@@ -605,6 +706,10 @@ tbody tr:hover {
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
+}
+
+.icon-button.danger {
+  color: var(--danger);
 }
 
 .visually-hidden {
@@ -679,11 +784,25 @@ tbody tr:hover {
   .admin-header,
   .admin-grid,
   .form-grid,
-  .preview-box {
+  .preview-box,
+  .match-admin-card {
     grid-template-columns: 1fr;
   }
 
   .admin-header {
     display: grid;
+  }
+
+  .inline-form,
+  .manager-row {
+    grid-template-columns: 1fr;
+  }
+
+  .player-rating {
+    text-align: left;
+  }
+
+  .row-actions {
+    justify-content: flex-start;
   }
 }
