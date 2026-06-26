@@ -1,8 +1,14 @@
-const ALLOWED_SCORES = new Set(['3:0', '3:1', '3:2']);
-
 export function validateScore(score) {
-  if (!ALLOWED_SCORES.has(String(score || '').trim())) {
-    return { valid: false, message: 'Score must be 3:0, 3:1, or 3:2.' };
+  const normalized = String(score || '').trim();
+  const match = normalized.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (!match) {
+    return { valid: false, message: 'Score must use two whole numbers, like 3:1.' };
+  }
+
+  const winnerGames = Number(match[1]);
+  const loserGames = Number(match[2]);
+  if (winnerGames <= loserGames) {
+    return { valid: false, message: 'Winner games must be greater than loser games.' };
   }
 
   return { valid: true };

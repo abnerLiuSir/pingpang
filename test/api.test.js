@@ -83,7 +83,7 @@ describe('api', () => {
     const created = await request(app, 'POST', '/api/matches', {
       winnerId: winner.id,
       loserId: loser.id,
-      score: '3:1',
+      score: '4:3',
       playedAt: '2026-06-26',
       note: '午休赛',
     }, token);
@@ -97,7 +97,7 @@ describe('api', () => {
     assert.equal(leaderboard.data.longTerm[0].rating, 1516);
     assert.equal(leaderboard.data.monthly[0].id, winner.id);
     assert.equal(leaderboard.data.monthly[0].ratingDelta, 16);
-    assert.equal(leaderboard.data.recentMatches[0].score, '3:1');
+    assert.equal(leaderboard.data.recentMatches[0].score, '4:3');
   });
 
   it('only reverts the most recent non-reverted match', async () => {

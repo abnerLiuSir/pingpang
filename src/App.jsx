@@ -677,6 +677,15 @@ function PanelTitle({ label, title, icon }) {
 }
 
 function MatchFields({ players, values, onChange }) {
+  const { winnerGames, loserGames } = scoreParts(values.score);
+
+  function updateScorePart(part, value) {
+    const cleanedValue = value.replace(/\D/g, '').slice(0, 2);
+    onChange('score', part === 'winner'
+      ? `${cleanedValue}:${loserGames}`
+      : `${winnerGames}:${cleanedValue}`);
+  }
+
   return (
     <>
       <div className="form-grid">
@@ -685,14 +694,36 @@ function MatchFields({ players, values, onChange }) {
           <input type="date" value={values.playedAt} onChange={(event) => onChange('playedAt', event.target.value)} />
         </label>
 
-        <label className="field-block">
+        <div className="field-block">
           <span>比分</span>
-          <select value={values.score} onChange={(event) => onChange('score', event.target.value)}>
-            <option value="3:0">3:0</option>
-            <option value="3:1">3:1</option>
-            <option value="3:2">3:2</option>
-          </select>
-        </label>
+          <div className="score-input-pair">
+            <label>
+              <small>胜者</small>
+              <input
+                type="number"
+                min="0"
+                max="99"
+                step="1"
+                inputMode="numeric"
+                value={winnerGames}
+                onChange={(event) => updateScorePart('winner', event.target.value)}
+              />
+            </label>
+            <strong aria-hidden="true">:</strong>
+            <label>
+              <small>负者</small>
+              <input
+                type="number"
+                min="0"
+                max="99"
+                step="1"
+                inputMode="numeric"
+                value={loserGames}
+                onChange={(event) => updateScorePart('loser', event.target.value)}
+              />
+            </label>
+          </div>
+        </div>
 
         <label className="field-block">
           <span>胜者</span>
@@ -723,6 +754,11 @@ function MatchFields({ players, values, onChange }) {
       </label>
     </>
   );
+}
+
+function scoreParts(score) {
+  const [winnerGames = '', loserGames = ''] = String(score || '').split(':');
+  return { winnerGames, loserGames };
 }
 
 function Delta({ value }) {
