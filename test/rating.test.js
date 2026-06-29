@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { calculateRatingChange } from '../server/rating.js';
+import { calculateRatingChange, calculateScoreMultiplier } from '../server/rating.js';
 
 describe('calculateRatingChange', () => {
   it('splits equal-rated players by 16 points at K 32', () => {
@@ -30,5 +30,15 @@ describe('calculateRatingChange', () => {
     assert.equal(result.loserDelta, -24);
     assert.equal(result.winnerRatingAfter, 1524);
     assert.equal(result.loserRatingAfter, 1676);
+  });
+
+  it('applies a small score multiplier when a score is supplied', () => {
+    const sweep = calculateRatingChange({ winnerRating: 1500, loserRating: 1500, score: '3:0' });
+    const close = calculateRatingChange({ winnerRating: 1500, loserRating: 1500, score: '3:2' });
+    const longSweep = calculateRatingChange({ winnerRating: 1500, loserRating: 1500, score: '11:0' });
+
+    assert.equal(calculateScoreMultiplier('4:3') > 1, true);
+    assert.equal(sweep.winnerDelta > close.winnerDelta, true);
+    assert.equal(longSweep.winnerDelta, 18);
   });
 });

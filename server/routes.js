@@ -48,7 +48,10 @@ export function createRouter({ db, adminPassphrase }) {
   });
 
   router.post('/players', requireAdmin, (req, res) => {
-    const result = createPlayer(db, { name: req.body?.name });
+    const result = createPlayer(db, {
+      name: req.body?.name,
+      avatarUrl: req.body?.avatarUrl,
+    });
     if (!result.valid) {
       res.status(400).json({ message: result.message });
       return;
@@ -60,6 +63,7 @@ export function createRouter({ db, adminPassphrase }) {
   router.patch('/players/:id', requireAdmin, (req, res) => {
     const result = updatePlayer(db, req.params.id, {
       name: req.body?.name,
+      avatarUrl: req.body?.avatarUrl,
       isActive: req.body?.isActive,
     });
     if (!result.valid) {

@@ -16,6 +16,7 @@ describe('validateScore', () => {
     assert.equal(validateScore('3:3').valid, false);
     assert.equal(validateScore('3-1').valid, false);
     assert.equal(validateScore('3.5:2').valid, false);
+    assert.equal(validateScore('3:1 (11-8, 9-11, 11-7, 11-5)').valid, false);
   });
 });
 

@@ -4,6 +4,7 @@ function rowToPlayer(row) {
   return {
     id: row.id,
     name: row.name,
+    avatarUrl: row.avatar_url || '',
     rating: row.rating,
     isActive: Boolean(row.is_active),
   };
@@ -32,26 +33,28 @@ function rowToMatch(row) {
 
 export function listPlayers(db) {
   return db
-    .prepare('SELECT id, name, rating, is_active FROM players WHERE is_active = 1 ORDER BY name ASC')
+    .prepare('SELECT id, name, avatar_url, rating, is_active FROM players WHERE is_active = 1 ORDER BY name ASC')
     .all()
     .map(rowToPlayer);
 }
 
 export function listAllPlayers(db) {
   return db
-    .prepare('SELECT id, name, rating, is_active FROM players ORDER BY is_active DESC, name ASC')
+    .prepare('SELECT id, name, avatar_url, rating, is_active FROM players ORDER BY is_active DESC, name ASC')
     .all()
     .map(rowToPlayer);
 }
 
-export function createPlayer(db, { name }) {
+export function createPlayer(db, { name, avatarUrl = '' }) {
   const trimmedName = String(name || '').trim();
   if (!trimmedName) {
     return { valid: false, message: 'Player name is required.' };
   }
+  const nextAvatarUrl = normalizeAvatarUrl(avatarUrl);
 
   try {
-    const result = db.prepare('INSERT INTO players (name, rating, is_active) VALUES (?, 1500, 1)').run(trimmedName);
+    const result = db.prepare('INSERT INTO players (name, avatar_url, rating, is_active) VALUES (?, ?, 1500, 1)')
+      .run(trimmedName, nextAvatarUrl);
     return { valid: true, player: getAnyPlayer(db, Number(result.lastInsertRowid)) };
   } catch (error) {
     if (String(error.message).includes('UNIQUE')) {
@@ -61,7 +64,7 @@ export function createPlayer(db, { name }) {
   }
 }
 
-export function updatePlayer(db, id, { name, isActive }) {
+export function updatePlayer(db, id, { name, avatarUrl, isActive }) {
   const player = getAnyPlayer(db, id);
   if (!player) {
     return { valid: false, message: 'Player was not found.' };
@@ -73,10 +76,11 @@ export function updatePlayer(db, id, { name, isActive }) {
   }
 
   const nextActive = isActive === undefined ? player.isActive : Boolean(isActive);
+  const nextAvatarUrl = avatarUrl === undefined ? player.avatarUrl : normalizeAvatarUrl(avatarUrl);
 
   try {
-    db.prepare('UPDATE players SET name = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-      .run(nextName, nextActive ? 1 : 0, Number(id));
+    db.prepare('UPDATE players SET name = ?, avatar_url = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(nextName, nextAvatarUrl, nextActive ? 1 : 0, Number(id));
     return { valid: true, player: getAnyPlayer(db, id) };
   } catch (error) {
     if (String(error.message).includes('UNIQUE')) {
@@ -88,14 +92,14 @@ export function updatePlayer(db, id, { name, isActive }) {
 
 export function getPlayer(db, id) {
   const row = db
-    .prepare('SELECT id, name, rating, is_active FROM players WHERE id = ? AND is_active = 1')
+    .prepare('SELECT id, name, avatar_url, rating, is_active FROM players WHERE id = ? AND is_active = 1')
     .get(Number(id));
   return row ? rowToPlayer(row) : null;
 }
 
 function getAnyPlayer(db, id) {
   const row = db
-    .prepare('SELECT id, name, rating, is_active FROM players WHERE id = ?')
+    .prepare('SELECT id, name, avatar_url, rating, is_active FROM players WHERE id = ?')
     .get(Number(id));
   return row ? rowToPlayer(row) : null;
 }
@@ -315,6 +319,7 @@ function listLongTermLeaderboard(db) {
     SELECT
       p.id,
       p.name,
+      p.avatar_url,
       p.rating,
       SUM(CASE WHEN m.winner_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END) AS wins,
       SUM(CASE WHEN m.loser_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END) AS losses,
@@ -338,6 +343,7 @@ function listLongTermLeaderboard(db) {
       id: player.id,
       rank: index + 1,
       name: player.name,
+      avatarUrl: player.avatar_url || '',
       rating: player.rating,
       wins,
       losses,
@@ -353,6 +359,7 @@ function listMonthlyLeaderboard(db, monthPrefix) {
     SELECT
       p.id,
       p.name,
+      p.avatar_url,
       p.rating,
       SUM(CASE WHEN m.winner_id = p.id THEN 1 ELSE 0 END) AS wins,
       SUM(CASE WHEN m.loser_id = p.id THEN 1 ELSE 0 END) AS losses,
@@ -376,6 +383,7 @@ function listMonthlyLeaderboard(db, monthPrefix) {
       id: player.id,
       rank: index + 1,
       name: player.name,
+      avatarUrl: player.avatar_url || '',
       rating: player.rating,
       wins,
       losses,
@@ -383,6 +391,10 @@ function listMonthlyLeaderboard(db, monthPrefix) {
       ratingDelta: player.rating_delta || 0,
     };
   });
+}
+
+function normalizeAvatarUrl(value) {
+  return String(value || '').trim();
 }
 
 function getRecentForm(db, playerId) {
@@ -399,7 +411,7 @@ function recalculateRatings(db) {
   const players = db.prepare('SELECT id FROM players').all();
   const ratings = new Map(players.map((player) => [player.id, 1500]));
   const matches = db.prepare(`
-    SELECT id, winner_id, loser_id
+    SELECT id, winner_id, loser_id, score
     FROM matches
     WHERE is_reverted = 0
     ORDER BY played_at ASC, id ASC
@@ -408,7 +420,11 @@ function recalculateRatings(db) {
   for (const match of matches) {
     const winnerRating = ratings.get(match.winner_id) ?? 1500;
     const loserRating = ratings.get(match.loser_id) ?? 1500;
-    const change = calculateRatingChange({ winnerRating, loserRating });
+    const change = calculateRatingChange({
+      winnerRating,
+      loserRating,
+      score: match.score,
+    });
 
     db.prepare(`
       UPDATE matches

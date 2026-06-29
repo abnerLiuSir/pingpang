@@ -2,15 +2,22 @@ import {
   Activity,
   ArrowDown,
   ArrowUp,
+  Calendar,
   Check,
+  Crown,
+  Flame,
   Lock,
+  Medal,
   Pencil,
   Plus,
-  RotateCcw,
   Save,
   Search,
+  Settings,
+  Swords,
   Trash2,
   Trophy,
+  TrendingUp,
+  Upload,
   Users,
   X,
 } from 'lucide-react';
@@ -43,7 +50,37 @@ async function apiRequest(path, { method = 'GET', body, token } = {}) {
 
 export function App() {
   const isAdminRoute = window.location.pathname === '/admin-score-entry';
-  return isAdminRoute ? <AdminPage /> : <PublicHome />;
+  return (
+    <div className="app-frame">
+      <AppHeader isAdminRoute={isAdminRoute} />
+      {isAdminRoute ? <AdminPage /> : <PublicHome />}
+    </div>
+  );
+}
+
+function AppHeader({ isAdminRoute }) {
+  return (
+    <header className="app-header">
+      <div className="app-header-inner">
+        <a className="brand-lockup" href="/" aria-label="PingPong Club 首页">
+          <span className="brand-mark">
+            <Activity size={24} aria-hidden="true" />
+          </span>
+          <span>PingPong Club</span>
+        </a>
+        <nav className="top-nav" aria-label="主导航">
+          <a className={isAdminRoute ? '' : 'active'} href="/">
+            <Trophy size={18} aria-hidden="true" />
+            首页
+          </a>
+          <a className={isAdminRoute ? 'active' : ''} href="/admin-score-entry">
+            <Settings size={18} aria-hidden="true" />
+            后台管理
+          </a>
+        </nav>
+      </div>
+    </header>
+  );
 }
 
 function PublicHome() {
@@ -77,76 +114,112 @@ function PublicHome() {
     return activeRows.filter((player) => player.name.toLowerCase().includes(normalizedQuery));
   }, [activeRows, query]);
 
-  const topThree = data?.longTerm?.slice(0, 3) || [];
+  const topThree = activeRows.slice(0, 3);
+  const displayRows = query.trim() ? filteredRows : filteredRows.slice(3);
+  const topPlayer = activeRows[0];
 
   return (
     <main className="page-shell">
-      <header className="public-header">
-        <div>
-          <p className="section-label">PingPang Rating</p>
-          <h1>公司乒乓积分</h1>
-          <p className="header-copy">长期积分不清零，本月榜记录最近状态。最后更新：{formatDateTime(data?.summary?.updatedAt)}</p>
-        </div>
-        <div className="summary-strip" aria-label="积分概览">
-          <SummaryItem label="球员" value={data?.summary?.totalPlayers ?? '--'} />
-          <SummaryItem label="总比赛" value={data?.summary?.totalMatches ?? '--'} />
-          <SummaryItem label="本月" value={data?.summary?.monthMatches ?? '--'} />
-        </div>
-      </header>
+      <section className="stat-grid" aria-label="积分概览">
+        <StatCard
+          tone="blue"
+          label="总选手"
+          value={data?.summary?.totalPlayers ?? '--'}
+          suffix="人"
+          icon={<Users size={80} aria-hidden="true" />}
+        />
+        <StatCard
+          tone="indigo"
+          label="总比赛"
+          value={data?.summary?.totalMatches ?? '--'}
+          suffix="场"
+          icon={<Activity size={80} aria-hidden="true" />}
+        />
+        <StatCard
+          tone="orange"
+          label="本月热战"
+          value={data?.summary?.monthMatches ?? '--'}
+          suffix="场"
+          icon={<Flame size={80} aria-hidden="true" />}
+        />
+        <StatCard
+          tone="gold"
+          label="当前榜首"
+          value={topPlayer?.name || '-'}
+          icon={<Crown size={80} aria-hidden="true" />}
+        />
+      </section>
 
       {status === 'loading' && <LeaderboardSkeleton />}
       {status === 'error' && <ErrorState message={error} onRetry={loadLeaderboard} />}
 
       {status === 'ready' && (
-        <>
-          <section className="hero-grid" aria-label="榜首和月度数据">
-            <TopThree players={topThree} />
-            <aside className="side-stack">
-              <MonthlyPanel players={data.monthly} />
-              <RecentMatches matches={data.recentMatches} />
-            </aside>
-          </section>
-
-          <section className="leaderboard-section">
-            <div className="section-toolbar">
-              <div>
-                <h2>{mode === 'longTerm' ? '长期积分榜' : '本月涨分榜'}</h2>
-                <p>按姓名搜索，快速查看同事当前排名和近期状态。</p>
+        <section className="content-grid" aria-label="榜单和近期赛况">
+          <section className="leaderboard-area">
+            <div className="section-toolbar board-toolbar">
+              <div className="title-lockup">
+                <span className="title-icon trophy-icon">
+                  <Trophy size={24} aria-hidden="true" />
+                </span>
+                <h1>鑽ｈ獕姒滃崟</h1>
               </div>
               <div className="toolbar-actions">
                 <label className="search-box">
                   <Search size={16} aria-hidden="true" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索球员" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="鎼滅储鐞冨憳" />
                 </label>
-                <div className="segmented" role="tablist" aria-label="榜单切换">
-                  <button className={mode === 'longTerm' ? 'active' : ''} onClick={() => setMode('longTerm')}>长期榜</button>
-                  <button className={mode === 'monthly' ? 'active' : ''} onClick={() => setMode('monthly')}>本月榜</button>
+                <div className="segmented" role="tablist" aria-label="姒滃崟鍒囨崲">
+                  <button className={mode === 'longTerm' ? 'active' : ''} onClick={() => setMode('longTerm')}>闀挎湡绉垎</button>
+                  <button className={mode === 'monthly' ? 'active' : ''} onClick={() => setMode('monthly')}>鏈堝害椋庝簯</button>
                 </div>
               </div>
             </div>
 
-            {filteredRows.length ? (
-              <LeaderboardTable players={filteredRows} showMonthly={mode === 'monthly'} />
-            ) : (
-              <EmptyState title="没有匹配的球员" body="换一个姓名关键字，或等后台录入更多比赛后再查看。" />
-            )}
+            <section className="leaderboard-card">
+              <TopThree players={topThree} showMonthly={mode === 'monthly'} />
+              {displayRows.length ? (
+                <LeaderboardTable players={displayRows} showMonthly={mode === 'monthly'} startRank={query.trim() ? 1 : 4} />
+              ) : (
+                <EmptyState title={query.trim() ? '没有匹配的球员' : '暂无更多球员'} body={query.trim() ? '换一个姓名关键字，或等后台录入更多比赛后再查看。' : '前三名之外的球员会显示在这里。'} />
+              )}
+            </section>
           </section>
-        </>
+
+          <aside className="matches-area">
+            <div className="section-toolbar compact-title">
+              <div className="title-lockup">
+                <span className="title-icon swords-icon">
+                  <Swords size={24} aria-hidden="true" />
+                </span>
+                <h1>杩戞湡璧涘喌</h1>
+              </div>
+              {data.recentMatches.length > 0 && <TrendingUp className="trend-icon" size={24} aria-hidden="true" />}
+            </div>
+            <RecentMatches matches={data.recentMatches} />
+            <MonthlyPanel players={data.monthly} />
+          </aside>
+        </section>
       )}
     </main>
   );
 }
 
-function SummaryItem({ label, value }) {
+function StatCard({ tone, label, value, suffix, icon }) {
   return (
-    <div className="summary-item">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className={`stat-card ${tone}`}>
+      <div className="stat-content">
+        <p>{label}</p>
+        <div>
+          <strong>{value}</strong>
+          {suffix && <span>{suffix}</span>}
+        </div>
+      </div>
+      <div className="stat-watermark">{icon}</div>
     </div>
   );
 }
 
-function TopThree({ players }) {
+function TopThree({ players, showMonthly }) {
   if (!players.length) {
     return <EmptyState title="暂无排名" body="添加球员并录入比赛后，首页会显示前三名。" />;
   }
@@ -154,30 +227,32 @@ function TopThree({ players }) {
   const [first, second, third] = players;
   return (
     <section className="podium-panel">
-      <div className="panel-heading">
-        <div>
-          <p className="section-label">Leaderboard</p>
-          <h2>当前前三</h2>
-        </div>
-        <Trophy size={22} aria-hidden="true" />
-      </div>
       <div className="podium">
-        <PodiumPlayer player={second} place="2" level="second" />
-        <PodiumPlayer player={first} place="1" level="first" />
-        <PodiumPlayer player={third} place="3" level="third" />
+        <PodiumPlayer player={second} place="2" level="second" showMonthly={showMonthly} />
+        <PodiumPlayer player={first} place="1" level="first" showMonthly={showMonthly} />
+        <PodiumPlayer player={third} place="3" level="third" showMonthly={showMonthly} />
       </div>
     </section>
   );
 }
 
-function PodiumPlayer({ player, place, level }) {
-  if (!player) return <div className={`podium-card ${level} muted`}>--</div>;
+function PodiumPlayer({ player, place, level, showMonthly }) {
+  if (!player) return <div className={`podium-player ${level} muted`}>--</div>;
+  const displayValue = showMonthly ? player.ratingDelta : player.rating;
   return (
-    <div className={`podium-card ${level}`}>
-      <span className="rank-mark">{place}</span>
-      <strong>{player.name}</strong>
-      <span>{player.rating}</span>
-      <small>{player.wins}胜 {player.losses}负</small>
+    <div className={`podium-player ${level}`}>
+      {place === '1' && <Crown className="podium-crown" size={32} aria-hidden="true" />}
+      <div className="avatar-wrap">
+        <PlayerAvatar player={player} className="avatar" />
+        <span className="rank-mark">{place}</span>
+      </div>
+      <strong title={player.name}>{player.name}</strong>
+      <span className={showMonthly ? 'podium-points monthly' : 'podium-points'}>
+        {showMonthly && displayValue > 0 ? `+${displayValue}` : displayValue} pts
+      </span>
+      <div className="podium-step">
+        {place === '1' ? <Trophy size={28} aria-hidden="true" /> : <Medal size={24} aria-hidden="true" />}
+      </div>
     </div>
   );
 }
@@ -187,8 +262,7 @@ function MonthlyPanel({ players }) {
     <section className="compact-panel">
       <div className="panel-heading compact">
         <div>
-          <p className="section-label">Month</p>
-          <h2>本月榜</h2>
+          <h2>鏈堝害椋庝簯</h2>
         </div>
         <Activity size={18} aria-hidden="true" />
       </div>
@@ -205,55 +279,78 @@ function MonthlyPanel({ players }) {
 
 function RecentMatches({ matches }) {
   return (
-    <section className="compact-panel">
-      <div className="panel-heading compact">
-        <div>
-          <p className="section-label">Recent</p>
-          <h2>最近比赛</h2>
-        </div>
-      </div>
+    <section className="timeline-panel">
       {matches.length ? matches.slice(0, 5).map((match) => (
-        <div className="match-row" key={match.id}>
-          <span>{match.winnerName}</span>
-          <strong>{match.score}</strong>
-          <span>{match.loserName}</span>
+        <div className="timeline-match" key={match.id}>
+          <div className="timeline-node">
+            <Swords size={16} aria-hidden="true" />
+          </div>
+          <div className="match-card">
+            <div className="match-date">
+              <Calendar size={12} aria-hidden="true" />
+              <span>{formatMatchDate(match.playedAt)}</span>
+            </div>
+            <div className="versus-row">
+              <PlayerBadge name={match.winnerName} winner />
+              <strong>{match.score}</strong>
+              <PlayerBadge name={match.loserName} />
+            </div>
+          </div>
         </div>
       )) : <p className="muted-copy">暂无比赛流水。</p>}
     </section>
   );
 }
 
-function LeaderboardTable({ players, showMonthly }) {
+function PlayerBadge({ name, winner }) {
   return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>排名</th>
-            <th>球员</th>
-            <th>积分</th>
-            <th>胜负</th>
-            <th>胜率</th>
-            <th>{showMonthly ? '本月变化' : '总变化'}</th>
-            <th>近 5 场</th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((player) => (
-            <tr key={player.id}>
-              <td>{player.rank}</td>
-              <td><strong>{player.name}</strong></td>
-              <td className="number-cell">{player.rating}</td>
-              <td>{player.wins} / {player.losses}</td>
-              <td>{player.winRate}%</td>
-              <td><Delta value={player.ratingDelta} /></td>
-              <td><FormDots form={player.recentForm || []} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className={winner ? 'player-badge winner' : 'player-badge'}>
+      <span>{name.charAt(0)}</span>
+      <strong title={name}>{name}</strong>
     </div>
   );
+}
+
+function PlayerAvatar({ player, className }) {
+  if (player.avatarUrl) {
+    return (
+      <img
+        className={className}
+        src={player.avatarUrl}
+        alt={`${player.name} 澶村儚`}
+        loading="lazy"
+      />
+    );
+  }
+
+  return <div className={className}>{player.name.charAt(0)}</div>;
+}
+
+function LeaderboardTable({ players, showMonthly, startRank = 1 }) {
+  return (
+    <div className="rank-list">
+      {players.map((player, index) => (
+        <div className="rank-row" key={player.id}>
+          <div className="rank-left">
+            <span className="rank-number">{querylessRank(player.rank, startRank + index)}</span>
+            <PlayerAvatar player={player} className="small-avatar" />
+            <div>
+              <strong>{player.name}</strong>
+              <small>{player.wins}胜 {player.losses}负 · 胜率 {player.winRate}%</small>
+            </div>
+          </div>
+          <div className="rank-right">
+            <span className="points-pill">{showMonthly ? <Delta value={player.ratingDelta} /> : `${player.rating} pts`}</span>
+            <FormDots form={player.recentForm || []} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function querylessRank(actualRank, fallbackRank) {
+  return actualRank || fallbackRank;
 }
 
 function AdminPage() {
@@ -265,7 +362,9 @@ function AdminPage() {
   const [matches, setMatches] = useState([]);
   const [leaderboard, setLeaderboard] = useState(null);
   const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerAvatar, setNewPlayerAvatar] = useState('');
   const [playerDrafts, setPlayerDrafts] = useState({});
+  const [playerAvatarDrafts, setPlayerAvatarDrafts] = useState({});
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [matchDraft, setMatchDraft] = useState(null);
   const [form, setForm] = useState({
@@ -314,6 +413,7 @@ function AdminPage() {
       setMatches(matchResult.matches);
       setLeaderboard(leaderboardResult);
       setPlayerDrafts(Object.fromEntries(allResult.players.map((player) => [player.id, player.name])));
+      setPlayerAvatarDrafts(Object.fromEntries(allResult.players.map((player) => [player.id, player.avatarUrl || ''])));
       setForm((current) => ({
         ...current,
         winnerId: current.winnerId || String(activeResult.players[0]?.id || ''),
@@ -397,9 +497,10 @@ function AdminPage() {
       const result = await apiRequest('/players', {
         method: 'POST',
         token,
-        body: { name: newPlayerName },
+        body: { name: newPlayerName, avatarUrl: newPlayerAvatar },
       });
       setNewPlayerName('');
+      setNewPlayerAvatar('');
       setSuccess(`已添加球员：${result.player.name}`);
       await loadAdminData(token);
     } catch (error) {
@@ -417,7 +518,11 @@ function AdminPage() {
       const result = await apiRequest(`/players/${player.id}`, {
         method: 'PATCH',
         token,
-        body: { name: playerDrafts[player.id], isActive: player.isActive },
+        body: {
+          name: playerDrafts[player.id],
+          avatarUrl: playerAvatarDrafts[player.id] || '',
+          isActive: player.isActive,
+        },
       });
       setSuccess(`已更新球员：${result.player.name}`);
       await loadAdminData(token);
@@ -560,7 +665,7 @@ function AdminPage() {
 
       <section className="admin-grid">
         <form className="entry-panel" onSubmit={submitMatch}>
-          <PanelTitle label="Score Entry" title="录入单打比赛" />
+          <PanelTitle label="Score Entry" title="褰曞叆鍗曟墦姣旇禌" />
           <MatchFields
             players={activePlayers}
             values={form}
@@ -571,12 +676,12 @@ function AdminPage() {
               <div>
                 <span>{preview.winner.name}</span>
                 <strong><Delta value={preview.winnerDelta} /></strong>
-                <small>{preview.winner.rating} → {preview.winnerRatingAfter}</small>
+                <small>{preview.winner.rating} 鈫?{preview.winnerRatingAfter}</small>
               </div>
               <div>
                 <span>{preview.loser.name}</span>
                 <strong><Delta value={preview.loserDelta} /></strong>
-                <small>{preview.loser.rating} → {preview.loserRatingAfter}</small>
+                <small>{preview.loser.rating} 鈫?{preview.loserRatingAfter}</small>
               </div>
             </div>
           )}
@@ -586,28 +691,43 @@ function AdminPage() {
         </form>
 
         <section className="entry-panel">
-          <PanelTitle label="Players" title="球员管理" icon={<Users size={18} aria-hidden="true" />} />
-          <form className="inline-form" onSubmit={addPlayer}>
-            <input value={newPlayerName} onChange={(event) => setNewPlayerName(event.target.value)} placeholder="新球员姓名" />
+          <PanelTitle label="Players" title="鐞冨憳绠＄悊" icon={<Users size={18} aria-hidden="true" />} />
+          <form className="player-create-form" onSubmit={addPlayer}>
+            <label className="field-block">
+              <span>閫夋墜濮撳悕</span>
+              <input value={newPlayerName} onChange={(event) => setNewPlayerName(event.target.value)} placeholder="新球员姓名" />
+            </label>
+            <AvatarUploader
+              label="澶村儚"
+              value={newPlayerAvatar}
+              name={newPlayerName}
+              onChange={setNewPlayerAvatar}
+            />
             <button className="secondary-button" disabled={busy || !newPlayerName.trim()}>
               <Plus size={16} aria-hidden="true" />
-              添加
+              娣诲姞
             </button>
           </form>
           <div className="manager-list">
             {allPlayers.map((player) => (
               <div className={player.isActive ? 'manager-row' : 'manager-row inactive'} key={player.id}>
+                <AvatarUploader
+                  value={playerAvatarDrafts[player.id] || ''}
+                  name={playerDrafts[player.id] || player.name}
+                  onChange={(value) => setPlayerAvatarDrafts((current) => ({ ...current, [player.id]: value }))}
+                />
                 <input
+                  className="manager-name-input"
                   value={playerDrafts[player.id] || ''}
                   onChange={(event) => setPlayerDrafts((current) => ({ ...current, [player.id]: event.target.value }))}
-                  aria-label={`${player.name} 姓名`}
+                  aria-label={`${player.name} 濮撳悕`}
                 />
                 <span className="player-rating">{player.rating}</span>
-                <button className="icon-button" onClick={() => savePlayer(player)} disabled={busy} title="保存姓名">
+                <button className="icon-button" onClick={() => savePlayer(player)} disabled={busy} title="淇濆瓨濮撳悕">
                   <Save size={15} aria-hidden="true" />
                 </button>
                 <button className="small-button" onClick={() => togglePlayer(player)} disabled={busy}>
-                  {player.isActive ? '停用' : '恢复'}
+                  {player.isActive ? '鍋滅敤' : '鎭㈠'}
                 </button>
               </div>
             ))}
@@ -616,7 +736,7 @@ function AdminPage() {
       </section>
 
       <section className="entry-panel match-manager">
-        <PanelTitle label="Matches" title="比赛记录管理" />
+        <PanelTitle label="Matches" title="姣旇禌璁板綍绠＄悊" />
         {matches.length ? matches.map((match) => (
           <div className={match.isReverted ? 'match-admin-card deleted' : 'match-admin-card'} key={match.id}>
             {editingMatchId === match.id ? (
@@ -629,11 +749,11 @@ function AdminPage() {
                 <div className="row-actions">
                   <button className="secondary-button" onClick={() => saveMatch(match.id)} disabled={busy}>
                     <Save size={15} aria-hidden="true" />
-                    保存
+                    淇濆瓨
                   </button>
                   <button className="secondary-button" onClick={() => { setEditingMatchId(null); setMatchDraft(null); }} disabled={busy}>
                     <X size={15} aria-hidden="true" />
-                    取消
+                    鍙栨秷
                   </button>
                 </div>
               </>
@@ -641,16 +761,16 @@ function AdminPage() {
               <>
                 <div className="match-admin-summary">
                   <strong>{match.winnerName} {match.score} {match.loserName}</strong>
-                  <span>{match.playedAt} · {match.winnerDelta > 0 ? `+${match.winnerDelta}` : match.winnerDelta} / {match.loserDelta}</span>
+                  <span>{match.playedAt} 路 {match.winnerDelta > 0 ? `+${match.winnerDelta}` : match.winnerDelta} / {match.loserDelta}</span>
                   {match.note && <small>{match.note}</small>}
                   {match.isReverted && <em>已删除，不参与积分</em>}
                 </div>
                 {!match.isReverted && (
                   <div className="row-actions">
-                    <button className="icon-button" onClick={() => startEditMatch(match)} disabled={busy} title="编辑比赛">
+                    <button className="icon-button" onClick={() => startEditMatch(match)} disabled={busy} title="缂栬緫姣旇禌">
                       <Pencil size={15} aria-hidden="true" />
                     </button>
-                    <button className="icon-button danger" onClick={() => deleteMatch(match.id)} disabled={busy} title="删除比赛">
+                    <button className="icon-button danger" onClick={() => deleteMatch(match.id)} disabled={busy} title="鍒犻櫎姣旇禌">
                       <Trash2 size={15} aria-hidden="true" />
                     </button>
                   </div>
@@ -676,14 +796,62 @@ function PanelTitle({ label, title, icon }) {
   );
 }
 
+function AvatarUploader({ label, value, name, onChange }) {
+  async function handleFileChange(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      window.alert('请选择图片文件。');
+      return;
+    }
+
+    const dataUrl = await readImageFile(file);
+    onChange(dataUrl);
+  }
+
+  return (
+    <div className="avatar-uploader">
+      {label && <span className="avatar-uploader-label">{label}</span>}
+      <div className="avatar-edit-row">
+        <div className="avatar-preview">
+          {value ? <img src={value} alt={`${name || '球员'} 头像预览`} /> : <span>{(name || '球').charAt(0)}</span>}
+        </div>
+        <div className="avatar-actions">
+          <label className="avatar-upload-button">
+            <Upload size={15} aria-hidden="true" />
+            涓婁紶澶村儚
+            <input type="file" accept="image/*" onChange={handleFileChange} />
+          </label>
+          {value && (
+            <button type="button" className="avatar-clear-button" onClick={() => onChange('')}>
+              绉婚櫎
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function readImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function MatchFields({ players, values, onChange }) {
   const { winnerGames, loserGames } = scoreParts(values.score);
 
   function updateScorePart(part, value) {
     const cleanedValue = value.replace(/\D/g, '').slice(0, 2);
-    onChange('score', part === 'winner'
-      ? `${cleanedValue}:${loserGames}`
-      : `${winnerGames}:${cleanedValue}`);
+    const nextWinnerGames = part === 'winner' ? cleanedValue : winnerGames;
+    const nextLoserGames = part === 'loser' ? cleanedValue : loserGames;
+    onChange('score', composeScore(nextWinnerGames, nextLoserGames));
   }
 
   return (
@@ -702,7 +870,7 @@ function MatchFields({ players, values, onChange }) {
               <input
                 type="number"
                 min="0"
-                max="99"
+                max="11"
                 step="1"
                 inputMode="numeric"
                 value={winnerGames}
@@ -715,7 +883,7 @@ function MatchFields({ players, values, onChange }) {
               <input
                 type="number"
                 min="0"
-                max="99"
+                max="11"
                 step="1"
                 inputMode="numeric"
                 value={loserGames}
@@ -757,10 +925,14 @@ function MatchFields({ players, values, onChange }) {
 }
 
 function scoreParts(score) {
-  const [winnerGames = '', loserGames = ''] = String(score || '').split(':');
-  return { winnerGames, loserGames };
+  const match = String(score || '').trim().match(/^(\d{0,2}):(\d{0,2})/);
+  if (!match) return { winnerGames: '', loserGames: '' };
+  return { winnerGames: match[1] || '', loserGames: match[2] || '' };
 }
 
+function composeScore(winnerGames, loserGames) {
+  return `${winnerGames}:${loserGames}`;
+}
 function Delta({ value }) {
   const className = value > 0 ? 'delta positive' : value < 0 ? 'delta negative' : 'delta neutral';
   const Icon = value >= 0 ? ArrowUp : ArrowDown;
@@ -775,7 +947,7 @@ function Delta({ value }) {
 function FormDots({ form }) {
   if (!form.length) return <span className="muted-copy">--</span>;
   return (
-    <span className="form-dots" aria-label={`近况 ${form.join(' ')}`}>
+    <span className="form-dots" aria-label={`杩戝喌 ${form.join(' ')}`}>
       {form.map((item, index) => (
         <span key={`${item}-${index}`} className={item === 'W' ? 'win' : 'loss'}>{item}</span>
       ))}
@@ -785,7 +957,7 @@ function FormDots({ form }) {
 
 function LeaderboardSkeleton() {
   return (
-    <section className="skeleton-panel" aria-label="正在加载">
+    <section className="skeleton-panel" aria-label="姝ｅ湪鍔犺浇">
       {Array.from({ length: 8 }).map((_, index) => <div className="skeleton-row" key={index} />)}
     </section>
   );
@@ -803,14 +975,24 @@ function EmptyState({ title, body }) {
 function ErrorState({ message, onRetry }) {
   return (
     <div className="empty-state error-state">
-      <h2>数据加载失败</h2>
+      <h2>鏁版嵁鍔犺浇澶辫触</h2>
       <p>{message}</p>
-      <button className="secondary-button" onClick={onRetry}>重试</button>
+      <button className="secondary-button" onClick={onRetry}>閲嶈瘯</button>
     </div>
   );
 }
 
 function formatDateTime(value) {
+  if (!value) return '--';
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatMatchDate(value) {
   if (!value) return '--';
   return new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',

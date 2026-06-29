@@ -89,14 +89,14 @@ describe('api', () => {
     }, token);
 
     assert.equal(created.status, 201);
-    assert.equal(created.data.match.winnerDelta, 16);
-    assert.equal(created.data.match.loserDelta, -16);
+    assert.equal(created.data.match.winnerDelta, 17);
+    assert.equal(created.data.match.loserDelta, -17);
 
     const leaderboard = await request(app, 'GET', '/api/leaderboard');
     assert.equal(leaderboard.data.longTerm[0].id, winner.id);
-    assert.equal(leaderboard.data.longTerm[0].rating, 1516);
+    assert.equal(leaderboard.data.longTerm[0].rating, 1517);
     assert.equal(leaderboard.data.monthly[0].id, winner.id);
-    assert.equal(leaderboard.data.monthly[0].ratingDelta, 16);
+    assert.equal(leaderboard.data.monthly[0].ratingDelta, 17);
     assert.equal(leaderboard.data.recentMatches[0].score, '4:3');
   });
 
@@ -124,19 +124,26 @@ describe('api', () => {
   it('creates, renames, disables, and restores players', async () => {
     const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
     const token = login.data.token;
+    const avatarUrl = 'data:image/svg+xml;base64,PHN2Zy8+';
 
-    const created = await request(app, 'POST', '/api/players', { name: 'Test Player Alpha' }, token);
+    const created = await request(app, 'POST', '/api/players', {
+      name: 'Test Player Alpha',
+      avatarUrl,
+    }, token);
     assert.equal(created.status, 201);
     assert.equal(created.data.player.name, 'Test Player Alpha');
+    assert.equal(created.data.player.avatarUrl, avatarUrl);
     assert.equal(created.data.player.rating, 1500);
     assert.equal(created.data.player.isActive, true);
 
     const renamed = await request(app, 'PATCH', `/api/players/${created.data.player.id}`, {
       name: 'Test Player Beta',
+      avatarUrl: '',
       isActive: false,
     }, token);
     assert.equal(renamed.status, 200);
     assert.equal(renamed.data.player.name, 'Test Player Beta');
+    assert.equal(renamed.data.player.avatarUrl, '');
     assert.equal(renamed.data.player.isActive, false);
 
     const activePlayers = await request(app, 'GET', '/api/players', undefined, token);
@@ -193,8 +200,8 @@ describe('api', () => {
     const two = leaderboard.data.longTerm.find((player) => player.id === p2.id);
     const three = leaderboard.data.longTerm.find((player) => player.id === p3.id);
 
-    assert.equal(two.rating, 1516);
-    assert.equal(one.rating, 1484);
+    assert.equal(two.rating, 1517);
+    assert.equal(one.rating, 1483);
     assert.equal(three.rating, 1500);
 
     const matches = await request(app, 'GET', '/api/admin/matches', undefined, token);

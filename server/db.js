@@ -19,6 +19,7 @@ export function initializeDatabase(db) {
     CREATE TABLE IF NOT EXISTS players (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
+      avatar_url TEXT NOT NULL DEFAULT '',
       rating INTEGER NOT NULL DEFAULT 1500,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -43,6 +44,11 @@ export function initializeDatabase(db) {
       reverted_at TEXT
     );
   `);
+
+  const playerColumns = db.prepare("PRAGMA table_info(players)").all().map((column) => column.name);
+  if (!playerColumns.includes('avatar_url')) {
+    db.exec("ALTER TABLE players ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''");
+  }
 
   const existing = db.prepare('SELECT COUNT(*) AS count FROM players').get().count;
   if (existing === 0) {
