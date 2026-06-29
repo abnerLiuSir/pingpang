@@ -159,6 +159,28 @@ describe('api', () => {
     assert.equal(restored.data.player.isActive, true);
   });
 
+  it('accepts cropped avatar payloads without hitting the JSON body limit', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+    const avatarUrl = `data:image/jpeg;base64,${'a'.repeat(180_000)}`;
+
+    const created = await request(app, 'POST', '/api/players', {
+      name: 'Large Avatar Player',
+      avatarUrl,
+    }, token);
+
+    assert.equal(created.status, 201);
+    assert.equal(created.data.player.avatarUrl.length, avatarUrl.length);
+
+    const updatedAvatarUrl = `data:image/jpeg;base64,${'b'.repeat(220_000)}`;
+    const updated = await request(app, 'PATCH', `/api/players/${created.data.player.id}`, {
+      avatarUrl: updatedAvatarUrl,
+    }, token);
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.data.player.avatarUrl.length, updatedAvatarUrl.length);
+  });
+
   it('edits and soft-deletes matches, then recalculates ratings from match history', async () => {
     const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
     const token = login.data.token;

@@ -8,7 +8,7 @@ const projectRoot = path.resolve(__dirname, '..');
 
 export function createApp({ db, adminPassphrase = process.env.ADMIN_PASSPHRASE || 'score-keeper' } = {}) {
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: '2mb' }));
 
   if (db) {
     app.use('/api', createRouter({ db, adminPassphrase }));

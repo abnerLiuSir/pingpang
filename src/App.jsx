@@ -63,11 +63,11 @@ function AppHeader({ isAdminRoute }) {
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        <a className="brand-lockup" href="/" aria-label="PingPong Club 首页">
+        <a className="brand-lockup" href="/" aria-label="一板成名榜 首页">
           <span className="brand-mark">
             <Activity size={24} aria-hidden="true" />
           </span>
-          <span>PingPong Club</span>
+          <span>一板成名榜</span>
         </a>
         <nav className="top-nav" aria-label="主导航">
           <a className={isAdminRoute ? '' : 'active'} href="/">
@@ -923,7 +923,7 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
     if (!canvas || !image) return;
 
     try {
-      onConfirm(canvas.toDataURL('image/png'));
+      onConfirm(canvas.toDataURL('image/jpeg', 0.82));
     } catch (confirmationError) {
       setError('当前图片不允许跨域裁剪，请下载后本地上传，或换一个允许访问的图片 URL。');
     }
@@ -943,7 +943,7 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
         </div>
 
         <div className="avatar-crop-stage">
-          <canvas ref={canvasRef} width="240" height="240" aria-label="头像裁剪预览" />
+          <canvas ref={canvasRef} width="160" height="160" aria-label="头像裁剪预览" />
           <span className="avatar-crop-ring" aria-hidden="true" />
         </div>
 
