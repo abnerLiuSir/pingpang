@@ -6,6 +6,7 @@ import {
   Check,
   Crown,
   Flame,
+  Link2,
   Lock,
   Medal,
   Pencil,
@@ -22,7 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const API_BASE = '/api';
 
@@ -798,6 +799,9 @@ function PanelTitle({ label, title, icon }) {
 }
 
 function AvatarUploader({ label, value, name, onChange }) {
+  const [urlValue, setUrlValue] = useState('');
+  const [cropSource, setCropSource] = useState('');
+
   async function handleFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -809,7 +813,26 @@ function AvatarUploader({ label, value, name, onChange }) {
     }
 
     const dataUrl = await readImageFile(file);
+    setCropSource(dataUrl);
+  }
+
+  function handleUrlSubmit() {
+    const nextUrl = urlValue.trim();
+    if (!nextUrl) return;
+    setCropSource(nextUrl);
+  }
+
+  function handleUrlKeyDown(event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    handleUrlSubmit();
+  }
+
+  function handleCropConfirm(dataUrl) {
     onChange(dataUrl);
+    setCropSource('');
+    setUrlValue('');
   }
 
   return (
@@ -832,8 +855,147 @@ function AvatarUploader({ label, value, name, onChange }) {
           )}
         </div>
       </div>
+      <div className="avatar-url-form">
+        <input
+          type="text"
+          value={urlValue}
+          onChange={(event) => setUrlValue(event.target.value)}
+          onKeyDown={handleUrlKeyDown}
+          placeholder="粘贴图片 URL"
+          aria-label="图片 URL"
+        />
+        <button type="button" className="avatar-url-button" onClick={handleUrlSubmit} disabled={!urlValue.trim()}>
+          <Link2 size={14} aria-hidden="true" />
+          使用
+        </button>
+      </div>
+      {cropSource && (
+        <AvatarCropModal
+          source={cropSource}
+          onCancel={() => setCropSource('')}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
+}
+
+function AvatarCropModal({ source, onCancel, onConfirm }) {
+  const canvasRef = useRef(null);
+  const [image, setImage] = useState(null);
+  const [error, setError] = useState('');
+  const [scale, setScale] = useState(1.2);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const nextImage = new Image();
+    nextImage.crossOrigin = 'anonymous';
+    nextImage.onload = () => {
+      if (!active) return;
+      setImage(nextImage);
+      setError('');
+      setScale(1.2);
+      setOffsetX(0);
+      setOffsetY(0);
+    };
+    nextImage.onerror = () => {
+      if (!active) return;
+      setImage(null);
+      setError('图片加载失败，请检查 URL 或换一张图片。');
+    };
+    nextImage.src = source;
+
+    return () => {
+      active = false;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+    drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY });
+  }, [image, offsetX, offsetY, scale]);
+
+  function handleConfirm() {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+
+    try {
+      onConfirm(canvas.toDataURL('image/png'));
+    } catch (confirmationError) {
+      setError('当前图片不允许跨域裁剪，请下载后本地上传，或换一个允许访问的图片 URL。');
+    }
+  }
+
+  return (
+    <div className="avatar-crop-backdrop" role="dialog" aria-modal="true" aria-label="调整头像">
+      <div className="avatar-crop-modal">
+        <div className="avatar-crop-header">
+          <div>
+            <p className="section-label">头像裁剪</p>
+            <h3>调整圆形头像</h3>
+          </div>
+          <button type="button" className="icon-button" onClick={onCancel} title="关闭">
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="avatar-crop-stage">
+          <canvas ref={canvasRef} width="240" height="240" aria-label="头像裁剪预览" />
+          <span className="avatar-crop-ring" aria-hidden="true" />
+        </div>
+
+        {error && <p className="form-error">{error}</p>}
+
+        <div className="avatar-crop-controls">
+          <label>
+            <span>缩放</span>
+            <input type="range" min="1" max="3" step="0.05" value={scale} onChange={(event) => setScale(Number(event.target.value))} disabled={!image} />
+          </label>
+          <label>
+            <span>左右</span>
+            <input type="range" min="-100" max="100" step="1" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} disabled={!image} />
+          </label>
+          <label>
+            <span>上下</span>
+            <input type="range" min="-100" max="100" step="1" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} disabled={!image} />
+          </label>
+        </div>
+
+        <div className="avatar-crop-actions">
+          <button type="button" className="secondary-button" onClick={onCancel}>
+            取消
+          </button>
+          <button type="button" className="primary-button" onClick={handleConfirm} disabled={!image}>
+            保存头像
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY }) {
+  const context = canvas.getContext('2d');
+  const size = canvas.width;
+  if (!context) return;
+
+  context.clearRect(0, 0, size, size);
+  context.save();
+  context.beginPath();
+  context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  context.clip();
+
+  const coverRatio = Math.max(size / image.naturalWidth, size / image.naturalHeight);
+  const drawWidth = image.naturalWidth * coverRatio * scale;
+  const drawHeight = image.naturalHeight * coverRatio * scale;
+  const x = (size - drawWidth) / 2 + offsetX;
+  const y = (size - drawHeight) / 2 + offsetY;
+
+  context.drawImage(image, x, y, drawWidth, drawHeight);
+  context.restore();
 }
 
 function readImageFile(file) {
