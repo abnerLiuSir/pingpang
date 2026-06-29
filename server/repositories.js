@@ -99,6 +99,10 @@ export function getPlayer(db, id) {
   return row ? rowToPlayer(row) : null;
 }
 
+export function getPublicPlayer(db, id) {
+  return getAnyPlayer(db, id);
+}
+
 function getAnyPlayer(db, id) {
   const row = db
     .prepare('SELECT id, name, avatar_url, rating, is_active FROM players WHERE id = ?')
@@ -231,7 +235,7 @@ export function getMatch(db, id) {
   return row ? rowToMatch(row) : null;
 }
 
-export function listRecentMatches(db, limit = 8) {
+export function listRecentMatches(db, limit = 5) {
   return db.prepare(`
     SELECT
       m.*,
@@ -321,6 +325,92 @@ export function getLeaderboard(db, now = new Date()) {
       monthMatches,
       updatedAt: new Date().toISOString(),
     },
+  };
+}
+
+export function getPlayerMatchHistory(db, playerId, { scope = 'all', opponentId } = {}, now = new Date()) {
+  const player = getPublicPlayer(db, playerId);
+  if (!player) {
+    return { valid: false, message: 'Player was not found.' };
+  }
+
+  const scopedMatches = listPlayerHistoryMatches(db, player.id, scope, now).map((match) => shapePlayerHistoryMatch(match, player.id));
+  const filteredMatches = opponentId
+    ? scopedMatches.filter((match) => match.opponentId === Number(opponentId))
+    : scopedMatches;
+  const wins = filteredMatches.filter((match) => match.result === 'W').length;
+  const losses = filteredMatches.length - wins;
+  const ratingDelta = filteredMatches.reduce((total, match) => total + match.ratingDelta, 0);
+  const opponents = Array.from(
+    scopedMatches.reduce((map, match) => {
+      if (!map.has(match.opponentId)) {
+        map.set(match.opponentId, {
+          id: match.opponentId,
+          name: match.opponentName,
+          avatarUrl: match.opponentAvatarUrl,
+        });
+      }
+      return map;
+    }, new Map()).values(),
+  ).sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+
+  return {
+    valid: true,
+    player: {
+      id: player.id,
+      name: player.name,
+      avatarUrl: player.avatarUrl,
+      rating: player.rating,
+    },
+    scope,
+    summary: {
+      wins,
+      losses,
+      winRate: filteredMatches.length ? Math.round((wins / filteredMatches.length) * 100) : 0,
+      ratingDelta,
+      matches: filteredMatches.length,
+    },
+    opponents,
+    matches: filteredMatches,
+  };
+}
+
+function listPlayerHistoryMatches(db, playerId, scope, now) {
+  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthFilter = scope === 'month' ? 'AND substr(m.played_at, 1, 7) = ?' : '';
+  const params = scope === 'month' ? [playerId, playerId, monthPrefix] : [playerId, playerId];
+
+  return db.prepare(`
+    SELECT
+      m.*,
+      winner.name AS winner_name,
+      winner.avatar_url AS winner_avatar_url,
+      loser.name AS loser_name,
+      loser.avatar_url AS loser_avatar_url
+    FROM matches m
+    JOIN players winner ON winner.id = m.winner_id
+    JOIN players loser ON loser.id = m.loser_id
+    WHERE m.is_reverted = 0
+      AND (m.winner_id = ? OR m.loser_id = ?)
+      ${monthFilter}
+    ORDER BY m.played_at DESC, m.created_at DESC, m.id DESC
+  `).all(...params).map(rowToMatch);
+}
+
+function shapePlayerHistoryMatch(match, playerId) {
+  const won = match.winnerId === Number(playerId);
+  return {
+    id: match.id,
+    playedAt: match.playedAt,
+    opponentId: won ? match.loserId : match.winnerId,
+    opponentName: won ? match.loserName : match.winnerName,
+    opponentAvatarUrl: won ? match.loserAvatarUrl : match.winnerAvatarUrl,
+    result: won ? 'W' : 'L',
+    score: match.score,
+    ratingDelta: won ? match.winnerDelta : match.loserDelta,
+    playerRatingBefore: won ? match.winnerRatingBefore : match.loserRatingBefore,
+    playerRatingAfter: won ? match.winnerRatingAfter : match.loserRatingAfter,
+    note: match.note,
   };
 }
 

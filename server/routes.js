@@ -4,6 +4,7 @@ import {
   createPlayer,
   createMatch,
   getLeaderboard,
+  getPlayerMatchHistory,
   listAllMatches,
   listAllPlayers,
   listPlayers,
@@ -37,6 +38,28 @@ export function createRouter({ db, adminPassphrase }) {
 
   router.get('/leaderboard', (req, res) => {
     res.json(getLeaderboard(db));
+  });
+
+  router.get('/players/:id/matches', (req, res) => {
+    const scope = req.query?.scope || 'all';
+    if (!['all', 'month'].includes(scope)) {
+      res.status(400).json({ message: 'Scope must be all or month.' });
+      return;
+    }
+
+    const opponentId = req.query?.opponentId ? Number(req.query.opponentId) : undefined;
+    if (req.query?.opponentId && !Number.isInteger(opponentId)) {
+      res.status(400).json({ message: 'Opponent id must be a number.' });
+      return;
+    }
+
+    const result = getPlayerMatchHistory(db, req.params.id, { scope, opponentId });
+    if (!result.valid) {
+      res.status(404).json({ message: result.message });
+      return;
+    }
+
+    res.json(result);
   });
 
   router.get('/players', requireAdmin, (req, res) => {
