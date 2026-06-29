@@ -161,16 +161,16 @@ function PublicHome() {
                 <span className="title-icon trophy-icon">
                   <Trophy size={24} aria-hidden="true" />
                 </span>
-                <h1>鑽ｈ獕姒滃崟</h1>
+                <h1>荣誉榜单</h1>
               </div>
               <div className="toolbar-actions">
                 <label className="search-box">
                   <Search size={16} aria-hidden="true" />
-                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="鎼滅储鐞冨憳" />
+                  <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索球员" />
                 </label>
-                <div className="segmented" role="tablist" aria-label="姒滃崟鍒囨崲">
-                  <button className={mode === 'longTerm' ? 'active' : ''} onClick={() => setMode('longTerm')}>闀挎湡绉垎</button>
-                  <button className={mode === 'monthly' ? 'active' : ''} onClick={() => setMode('monthly')}>鏈堝害椋庝簯</button>
+                <div className="segmented" role="tablist" aria-label="榜单切换">
+                  <button className={mode === 'longTerm' ? 'active' : ''} onClick={() => setMode('longTerm')}>长期积分</button>
+                  <button className={mode === 'monthly' ? 'active' : ''} onClick={() => setMode('monthly')}>月度风云</button>
                 </div>
               </div>
             </div>
@@ -191,7 +191,7 @@ function PublicHome() {
                 <span className="title-icon swords-icon">
                   <Swords size={24} aria-hidden="true" />
                 </span>
-                <h1>杩戞湡璧涘喌</h1>
+                <h1>近期赛况</h1>
               </div>
               {data.recentMatches.length > 0 && <TrendingUp className="trend-icon" size={24} aria-hidden="true" />}
             </div>
@@ -262,7 +262,7 @@ function MonthlyPanel({ players }) {
     <section className="compact-panel">
       <div className="panel-heading compact">
         <div>
-          <h2>鏈堝害椋庝簯</h2>
+          <h2>月度风云</h2>
         </div>
         <Activity size={18} aria-hidden="true" />
       </div>
@@ -317,7 +317,7 @@ function PlayerAvatar({ player, className }) {
       <img
         className={className}
         src={player.avatarUrl}
-        alt={`${player.name} 澶村儚`}
+        alt={`${player.name} 头像`}
         loading="lazy"
       />
     );
@@ -665,7 +665,7 @@ function AdminPage() {
 
       <section className="admin-grid">
         <form className="entry-panel" onSubmit={submitMatch}>
-          <PanelTitle label="Score Entry" title="褰曞叆鍗曟墦姣旇禌" />
+          <PanelTitle label="Score Entry" title="录入单打比赛" />
           <MatchFields
             players={activePlayers}
             values={form}
@@ -676,12 +676,12 @@ function AdminPage() {
               <div>
                 <span>{preview.winner.name}</span>
                 <strong><Delta value={preview.winnerDelta} /></strong>
-                <small>{preview.winner.rating} 鈫?{preview.winnerRatingAfter}</small>
+                <small>{preview.winner.rating} → {preview.winnerRatingAfter}</small>
               </div>
               <div>
                 <span>{preview.loser.name}</span>
                 <strong><Delta value={preview.loserDelta} /></strong>
-                <small>{preview.loser.rating} 鈫?{preview.loserRatingAfter}</small>
+                <small>{preview.loser.rating} → {preview.loserRatingAfter}</small>
               </div>
             </div>
           )}
@@ -691,21 +691,21 @@ function AdminPage() {
         </form>
 
         <section className="entry-panel">
-          <PanelTitle label="Players" title="鐞冨憳绠＄悊" icon={<Users size={18} aria-hidden="true" />} />
+          <PanelTitle label="Players" title="球员管理" icon={<Users size={18} aria-hidden="true" />} />
           <form className="player-create-form" onSubmit={addPlayer}>
             <label className="field-block">
-              <span>閫夋墜濮撳悕</span>
+              <span>选手姓名</span>
               <input value={newPlayerName} onChange={(event) => setNewPlayerName(event.target.value)} placeholder="新球员姓名" />
             </label>
             <AvatarUploader
-              label="澶村儚"
+              label="头像"
               value={newPlayerAvatar}
               name={newPlayerName}
               onChange={setNewPlayerAvatar}
             />
             <button className="secondary-button" disabled={busy || !newPlayerName.trim()}>
               <Plus size={16} aria-hidden="true" />
-              娣诲姞
+              添加
             </button>
           </form>
           <div className="manager-list">
@@ -720,14 +720,14 @@ function AdminPage() {
                   className="manager-name-input"
                   value={playerDrafts[player.id] || ''}
                   onChange={(event) => setPlayerDrafts((current) => ({ ...current, [player.id]: event.target.value }))}
-                  aria-label={`${player.name} 濮撳悕`}
+                  aria-label={`${player.name} 姓名`}
                 />
                 <span className="player-rating">{player.rating}</span>
-                <button className="icon-button" onClick={() => savePlayer(player)} disabled={busy} title="淇濆瓨濮撳悕">
+                <button className="icon-button" onClick={() => savePlayer(player)} disabled={busy} title="保存姓名">
                   <Save size={15} aria-hidden="true" />
                 </button>
                 <button className="small-button" onClick={() => togglePlayer(player)} disabled={busy}>
-                  {player.isActive ? '鍋滅敤' : '鎭㈠'}
+                  {player.isActive ? '停用' : '恢复'}
                 </button>
               </div>
             ))}
@@ -736,7 +736,7 @@ function AdminPage() {
       </section>
 
       <section className="entry-panel match-manager">
-        <PanelTitle label="Matches" title="姣旇禌璁板綍绠＄悊" />
+        <PanelTitle label="Matches" title="比赛记录管理" />
         {matches.length ? matches.map((match) => (
           <div className={match.isReverted ? 'match-admin-card deleted' : 'match-admin-card'} key={match.id}>
             {editingMatchId === match.id ? (
@@ -749,11 +749,11 @@ function AdminPage() {
                 <div className="row-actions">
                   <button className="secondary-button" onClick={() => saveMatch(match.id)} disabled={busy}>
                     <Save size={15} aria-hidden="true" />
-                    淇濆瓨
+                    保存
                   </button>
                   <button className="secondary-button" onClick={() => { setEditingMatchId(null); setMatchDraft(null); }} disabled={busy}>
                     <X size={15} aria-hidden="true" />
-                    鍙栨秷
+                    取消
                   </button>
                 </div>
               </>
@@ -761,16 +761,16 @@ function AdminPage() {
               <>
                 <div className="match-admin-summary">
                   <strong>{match.winnerName} {match.score} {match.loserName}</strong>
-                  <span>{match.playedAt} 路 {match.winnerDelta > 0 ? `+${match.winnerDelta}` : match.winnerDelta} / {match.loserDelta}</span>
+                  <span>{match.playedAt} · {match.winnerDelta > 0 ? `+${match.winnerDelta}` : match.winnerDelta} / {match.loserDelta}</span>
                   {match.note && <small>{match.note}</small>}
                   {match.isReverted && <em>已删除，不参与积分</em>}
                 </div>
                 {!match.isReverted && (
                   <div className="row-actions">
-                    <button className="icon-button" onClick={() => startEditMatch(match)} disabled={busy} title="缂栬緫姣旇禌">
+                    <button className="icon-button" onClick={() => startEditMatch(match)} disabled={busy} title="编辑比赛">
                       <Pencil size={15} aria-hidden="true" />
                     </button>
-                    <button className="icon-button danger" onClick={() => deleteMatch(match.id)} disabled={busy} title="鍒犻櫎姣旇禌">
+                    <button className="icon-button danger" onClick={() => deleteMatch(match.id)} disabled={busy} title="删除比赛">
                       <Trash2 size={15} aria-hidden="true" />
                     </button>
                   </div>
@@ -821,12 +821,12 @@ function AvatarUploader({ label, value, name, onChange }) {
         <div className="avatar-actions">
           <label className="avatar-upload-button">
             <Upload size={15} aria-hidden="true" />
-            涓婁紶澶村儚
+            上传头像
             <input type="file" accept="image/*" onChange={handleFileChange} />
           </label>
           {value && (
             <button type="button" className="avatar-clear-button" onClick={() => onChange('')}>
-              绉婚櫎
+              移除
             </button>
           )}
         </div>
@@ -947,7 +947,7 @@ function Delta({ value }) {
 function FormDots({ form }) {
   if (!form.length) return <span className="muted-copy">--</span>;
   return (
-    <span className="form-dots" aria-label={`杩戝喌 ${form.join(' ')}`}>
+    <span className="form-dots" aria-label={`近况 ${form.join(' ')}`}>
       {form.map((item, index) => (
         <span key={`${item}-${index}`} className={item === 'W' ? 'win' : 'loss'}>{item}</span>
       ))}
@@ -975,9 +975,9 @@ function EmptyState({ title, body }) {
 function ErrorState({ message, onRetry }) {
   return (
     <div className="empty-state error-state">
-      <h2>鏁版嵁鍔犺浇澶辫触</h2>
+      <h2>数据加载失败</h2>
       <p>{message}</p>
-      <button className="secondary-button" onClick={onRetry}>閲嶈瘯</button>
+      <button className="secondary-button" onClick={onRetry}>重试</button>
     </div>
   );
 }
