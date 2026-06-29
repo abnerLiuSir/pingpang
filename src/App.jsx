@@ -1,11 +1,13 @@
 import {
   Activity,
+  ArrowLeft,
   ArrowDown,
   ArrowUp,
   Calendar,
   Check,
   Crown,
   Flame,
+  Link2,
   Lock,
   Medal,
   Pencil,
@@ -22,7 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const API_BASE = '/api';
 
@@ -49,11 +51,13 @@ async function apiRequest(path, { method = 'GET', body, token } = {}) {
 }
 
 export function App() {
-  const isAdminRoute = window.location.pathname === '/admin-score-entry';
+  const path = window.location.pathname;
+  const isAdminRoute = path === '/admin-score-entry';
+  const playerRouteMatch = path.match(/^\/players\/(\d+)\/?$/);
   return (
     <div className="app-frame">
       <AppHeader isAdminRoute={isAdminRoute} />
-      {isAdminRoute ? <AdminPage /> : <PublicHome />}
+      {isAdminRoute ? <AdminPage /> : playerRouteMatch ? <PlayerHistoryPage playerId={Number(playerRouteMatch[1])} /> : <PublicHome />}
     </div>
   );
 }
@@ -62,11 +66,11 @@ function AppHeader({ isAdminRoute }) {
   return (
     <header className="app-header">
       <div className="app-header-inner">
-        <a className="brand-lockup" href="/" aria-label="PingPong Club 首页">
+        <a className="brand-lockup" href="/" aria-label="一板成名榜 首页">
           <span className="brand-mark">
             <Activity size={24} aria-hidden="true" />
           </span>
-          <span>PingPong Club</span>
+          <span>一板成名榜</span>
         </a>
         <nav className="top-nav" aria-label="主导航">
           <a className={isAdminRoute ? '' : 'active'} href="/">
@@ -176,9 +180,9 @@ function PublicHome() {
             </div>
 
             <section className="leaderboard-card">
-              <TopThree players={topThree} showMonthly={mode === 'monthly'} />
+              <TopThree players={topThree} mode={mode} showMonthly={mode === 'monthly'} />
               {displayRows.length ? (
-                <LeaderboardTable players={displayRows} showMonthly={mode === 'monthly'} startRank={query.trim() ? 1 : 4} />
+                <LeaderboardTable players={displayRows} mode={mode} showMonthly={mode === 'monthly'} startRank={query.trim() ? 1 : 4} />
               ) : (
                 <EmptyState title={query.trim() ? '没有匹配的球员' : '暂无更多球员'} body={query.trim() ? '换一个姓名关键字，或等后台录入更多比赛后再查看。' : '前三名之外的球员会显示在这里。'} />
               )}
@@ -204,6 +208,162 @@ function PublicHome() {
   );
 }
 
+function PlayerHistoryPage({ playerId }) {
+  const [scope, setScope] = useState(initialHistoryScope);
+  const [opponentId, setOpponentId] = useState('');
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [error, setError] = useState('');
+
+  async function loadHistory() {
+    setStatus('loading');
+    setError('');
+    try {
+      const params = new URLSearchParams({ scope });
+      if (opponentId) params.set('opponentId', opponentId);
+      const result = await apiRequest(`/players/${playerId}/matches?${params.toString()}`);
+      setData(result);
+      setStatus('ready');
+    } catch (loadError) {
+      setError(loadError.message);
+      setStatus('error');
+    }
+  }
+
+  useEffect(() => {
+    loadHistory();
+  }, [playerId, scope, opponentId]);
+
+  function switchScope(nextScope) {
+    setScope(nextScope);
+    setOpponentId('');
+    window.history.replaceState(null, '', `/players/${playerId}?scope=${nextScope}`);
+  }
+
+  const hasOpponentFilter = Boolean(opponentId);
+  const summary = data?.summary;
+
+  return (
+    <main className="page-shell history-shell">
+      <a className="back-link" href="/">
+        <ArrowLeft size={16} aria-hidden="true" />
+        返回榜单
+      </a>
+
+      {status === 'loading' && <LeaderboardSkeleton />}
+
+      {status === 'error' && (
+        <div className="history-error">
+          <ErrorState message={error} onRetry={loadHistory} />
+          <a className="secondary-button" href="/">回到榜单</a>
+        </div>
+      )}
+
+      {status === 'ready' && data && (
+        <>
+          <section className="history-hero">
+            <div className="history-player">
+              <PlayerAvatar player={data.player} className="history-avatar" />
+              <div>
+                <p className="section-label">{scope === 'month' ? '月战绩' : '总战绩'}</p>
+                <h1>{data.player.name}</h1>
+                <p className="header-copy">当前积分 {data.player.rating} pts</p>
+              </div>
+            </div>
+            <div className="history-actions">
+              <div className="segmented" role="tablist" aria-label="战绩范围">
+                <button className={scope === 'all' ? 'active' : ''} onClick={() => switchScope('all')}>总战绩</button>
+                <button className={scope === 'month' ? 'active' : ''} onClick={() => switchScope('month')}>月战绩</button>
+              </div>
+              <label className="history-filter">
+                <span>对手</span>
+                <select value={opponentId} onChange={(event) => setOpponentId(event.target.value)}>
+                  <option value="">全部对手</option>
+                  {data.opponents.map((opponent) => (
+                    <option key={opponent.id} value={opponent.id}>{opponent.name}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="history-stats" aria-label="战绩概览">
+            <HistoryStat label="比赛" value={summary.matches} />
+            <HistoryStat label="胜负" value={`${summary.wins}胜 ${summary.losses}负`} />
+            <HistoryStat label="胜率" value={`${summary.winRate}%`} />
+            <HistoryStat label="积分变化" value={<Delta value={summary.ratingDelta} />} />
+          </section>
+
+          <section className="history-list-panel">
+            <div className="panel-heading compact">
+              <div>
+                <p className="section-label">Matches</p>
+                <h2>{scope === 'month' ? '本月比赛' : '全部比赛'}</h2>
+              </div>
+              <Swords size={18} aria-hidden="true" />
+            </div>
+
+            {data.matches.length ? (
+              <div className="history-list">
+                {data.matches.map((match) => (
+                  <HistoryMatchRow match={match} key={match.id} />
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                title={hasOpponentFilter ? '没有对阵记录' : '暂无比赛记录'}
+                body={hasOpponentFilter ? '换一个对手，或查看全部对手。' : '后台录入比赛后，这里会显示战绩流水。'}
+              />
+            )}
+          </section>
+        </>
+      )}
+    </main>
+  );
+}
+
+function initialHistoryScope() {
+  return new URLSearchParams(window.location.search).get('scope') === 'month' ? 'month' : 'all';
+}
+
+function HistoryStat({ label, value }) {
+  return (
+    <div className="history-stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function HistoryMatchRow({ match }) {
+  const won = match.result === 'W';
+  return (
+    <article className={won ? 'history-match won' : 'history-match lost'}>
+      <div className="history-match-main">
+        <div className="history-result">
+          <span>{won ? '胜' : '负'}</span>
+        </div>
+        <PlayerAvatar
+          player={{ name: match.opponentName, avatarUrl: match.opponentAvatarUrl }}
+          className="small-avatar"
+        />
+        <div className="history-opponent">
+          <strong>{match.opponentName}</strong>
+          <small>{formatHistoryDate(match.playedAt)}</small>
+        </div>
+      </div>
+      <div className="history-match-score">
+        <strong>{match.score}</strong>
+        <small>{match.playerRatingBefore} → {match.playerRatingAfter}</small>
+      </div>
+      <div className="history-match-delta">
+        <Delta value={match.ratingDelta} />
+      </div>
+      {match.note && <p className="history-note">{match.note}</p>}
+    </article>
+  );
+}
+
 function StatCard({ tone, label, value, suffix, icon }) {
   return (
     <div className={`stat-card ${tone}`}>
@@ -219,7 +379,7 @@ function StatCard({ tone, label, value, suffix, icon }) {
   );
 }
 
-function TopThree({ players, showMonthly }) {
+function TopThree({ players, mode, showMonthly }) {
   if (!players.length) {
     return <EmptyState title="暂无排名" body="添加球员并录入比赛后，首页会显示前三名。" />;
   }
@@ -228,19 +388,19 @@ function TopThree({ players, showMonthly }) {
   return (
     <section className="podium-panel">
       <div className="podium">
-        <PodiumPlayer player={second} place="2" level="second" showMonthly={showMonthly} />
-        <PodiumPlayer player={first} place="1" level="first" showMonthly={showMonthly} />
-        <PodiumPlayer player={third} place="3" level="third" showMonthly={showMonthly} />
+        <PodiumPlayer player={second} place="2" level="second" mode={mode} showMonthly={showMonthly} />
+        <PodiumPlayer player={first} place="1" level="first" mode={mode} showMonthly={showMonthly} />
+        <PodiumPlayer player={third} place="3" level="third" mode={mode} showMonthly={showMonthly} />
       </div>
     </section>
   );
 }
 
-function PodiumPlayer({ player, place, level, showMonthly }) {
+function PodiumPlayer({ player, place, level, mode, showMonthly }) {
   if (!player) return <div className={`podium-player ${level} muted`}>--</div>;
   const displayValue = showMonthly ? player.ratingDelta : player.rating;
   return (
-    <div className={`podium-player ${level}`}>
+    <a className={`podium-player ${level}`} href={playerHistoryHref(player.id, mode)} aria-label={`查看${player.name}战绩`}>
       {place === '1' && <Crown className="podium-crown" size={32} aria-hidden="true" />}
       <div className="avatar-wrap">
         <PlayerAvatar player={player} className="avatar" />
@@ -254,7 +414,7 @@ function PodiumPlayer({ player, place, level, showMonthly }) {
       <div className="podium-step">
         {place === '1' ? <Trophy size={28} aria-hidden="true" /> : <Medal size={24} aria-hidden="true" />}
       </div>
-    </div>
+    </a>
   );
 }
 
@@ -292,9 +452,9 @@ function RecentMatches({ matches }) {
               <span>{formatMatchDate(match.playedAt)}</span>
             </div>
             <div className="versus-row">
-              <PlayerBadge name={match.winnerName} winner />
+              <PlayerBadge player={{ name: match.winnerName, avatarUrl: match.winnerAvatarUrl }} winner />
               <strong>{match.score}</strong>
-              <PlayerBadge name={match.loserName} />
+              <PlayerBadge player={{ name: match.loserName, avatarUrl: match.loserAvatarUrl }} />
             </div>
           </div>
         </div>
@@ -303,11 +463,11 @@ function RecentMatches({ matches }) {
   );
 }
 
-function PlayerBadge({ name, winner }) {
+function PlayerBadge({ player, winner }) {
   return (
     <div className={winner ? 'player-badge winner' : 'player-badge'}>
-      <span>{name.charAt(0)}</span>
-      <strong title={name}>{name}</strong>
+      <PlayerAvatar player={player} className="badge-avatar" />
+      <strong title={player.name}>{player.name}</strong>
     </div>
   );
 }
@@ -327,11 +487,11 @@ function PlayerAvatar({ player, className }) {
   return <div className={className}>{player.name.charAt(0)}</div>;
 }
 
-function LeaderboardTable({ players, showMonthly, startRank = 1 }) {
+function LeaderboardTable({ players, mode, showMonthly, startRank = 1 }) {
   return (
     <div className="rank-list">
       {players.map((player, index) => (
-        <div className="rank-row" key={player.id}>
+        <a className="rank-row rank-row-link" href={playerHistoryHref(player.id, mode)} key={player.id} aria-label={`查看${player.name}战绩`}>
           <div className="rank-left">
             <span className="rank-number">{querylessRank(player.rank, startRank + index)}</span>
             <PlayerAvatar player={player} className="small-avatar" />
@@ -344,10 +504,15 @@ function LeaderboardTable({ players, showMonthly, startRank = 1 }) {
             <span className="points-pill">{showMonthly ? <Delta value={player.ratingDelta} /> : `${player.rating} pts`}</span>
             <FormDots form={player.recentForm || []} />
           </div>
-        </div>
+        </a>
       ))}
     </div>
   );
+}
+
+function playerHistoryHref(playerId, mode) {
+  const scope = mode === 'monthly' ? 'month' : 'all';
+  return `/players/${playerId}?scope=${scope}`;
 }
 
 function querylessRank(actualRank, fallbackRank) {
@@ -798,6 +963,9 @@ function PanelTitle({ label, title, icon }) {
 }
 
 function AvatarUploader({ label, value, name, onChange }) {
+  const [urlValue, setUrlValue] = useState('');
+  const [cropSource, setCropSource] = useState('');
+
   async function handleFileChange(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -809,7 +977,26 @@ function AvatarUploader({ label, value, name, onChange }) {
     }
 
     const dataUrl = await readImageFile(file);
+    setCropSource(dataUrl);
+  }
+
+  function handleUrlSubmit() {
+    const nextUrl = urlValue.trim();
+    if (!nextUrl) return;
+    setCropSource(nextUrl);
+  }
+
+  function handleUrlKeyDown(event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    event.stopPropagation();
+    handleUrlSubmit();
+  }
+
+  function handleCropConfirm(dataUrl) {
     onChange(dataUrl);
+    setCropSource('');
+    setUrlValue('');
   }
 
   return (
@@ -832,8 +1019,147 @@ function AvatarUploader({ label, value, name, onChange }) {
           )}
         </div>
       </div>
+      <div className="avatar-url-form">
+        <input
+          type="text"
+          value={urlValue}
+          onChange={(event) => setUrlValue(event.target.value)}
+          onKeyDown={handleUrlKeyDown}
+          placeholder="粘贴图片 URL"
+          aria-label="图片 URL"
+        />
+        <button type="button" className="avatar-url-button" onClick={handleUrlSubmit} disabled={!urlValue.trim()}>
+          <Link2 size={14} aria-hidden="true" />
+          使用
+        </button>
+      </div>
+      {cropSource && (
+        <AvatarCropModal
+          source={cropSource}
+          onCancel={() => setCropSource('')}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
+}
+
+function AvatarCropModal({ source, onCancel, onConfirm }) {
+  const canvasRef = useRef(null);
+  const [image, setImage] = useState(null);
+  const [error, setError] = useState('');
+  const [scale, setScale] = useState(1.2);
+  const [offsetX, setOffsetX] = useState(0);
+  const [offsetY, setOffsetY] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const nextImage = new Image();
+    nextImage.crossOrigin = 'anonymous';
+    nextImage.onload = () => {
+      if (!active) return;
+      setImage(nextImage);
+      setError('');
+      setScale(1.2);
+      setOffsetX(0);
+      setOffsetY(0);
+    };
+    nextImage.onerror = () => {
+      if (!active) return;
+      setImage(null);
+      setError('图片加载失败，请检查 URL 或换一张图片。');
+    };
+    nextImage.src = source;
+
+    return () => {
+      active = false;
+    };
+  }, [source]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+    drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY });
+  }, [image, offsetX, offsetY, scale]);
+
+  function handleConfirm() {
+    const canvas = canvasRef.current;
+    if (!canvas || !image) return;
+
+    try {
+      onConfirm(canvas.toDataURL('image/jpeg', 0.82));
+    } catch (confirmationError) {
+      setError('当前图片不允许跨域裁剪，请下载后本地上传，或换一个允许访问的图片 URL。');
+    }
+  }
+
+  return (
+    <div className="avatar-crop-backdrop" role="dialog" aria-modal="true" aria-label="调整头像">
+      <div className="avatar-crop-modal">
+        <div className="avatar-crop-header">
+          <div>
+            <p className="section-label">头像裁剪</p>
+            <h3>调整圆形头像</h3>
+          </div>
+          <button type="button" className="icon-button" onClick={onCancel} title="关闭">
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="avatar-crop-stage">
+          <canvas ref={canvasRef} width="160" height="160" aria-label="头像裁剪预览" />
+          <span className="avatar-crop-ring" aria-hidden="true" />
+        </div>
+
+        {error && <p className="form-error">{error}</p>}
+
+        <div className="avatar-crop-controls">
+          <label>
+            <span>缩放</span>
+            <input type="range" min="1" max="3" step="0.05" value={scale} onChange={(event) => setScale(Number(event.target.value))} disabled={!image} />
+          </label>
+          <label>
+            <span>左右</span>
+            <input type="range" min="-100" max="100" step="1" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} disabled={!image} />
+          </label>
+          <label>
+            <span>上下</span>
+            <input type="range" min="-100" max="100" step="1" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} disabled={!image} />
+          </label>
+        </div>
+
+        <div className="avatar-crop-actions">
+          <button type="button" className="secondary-button" onClick={onCancel}>
+            取消
+          </button>
+          <button type="button" className="primary-button" onClick={handleConfirm} disabled={!image}>
+            保存头像
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY }) {
+  const context = canvas.getContext('2d');
+  const size = canvas.width;
+  if (!context) return;
+
+  context.clearRect(0, 0, size, size);
+  context.save();
+  context.beginPath();
+  context.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  context.clip();
+
+  const coverRatio = Math.max(size / image.naturalWidth, size / image.naturalHeight);
+  const drawWidth = image.naturalWidth * coverRatio * scale;
+  const drawHeight = image.naturalHeight * coverRatio * scale;
+  const x = (size - drawWidth) / 2 + offsetX;
+  const y = (size - drawHeight) / 2 + offsetY;
+
+  context.drawImage(image, x, y, drawWidth, drawHeight);
+  context.restore();
 }
 
 function readImageFile(file) {
@@ -1000,5 +1326,14 @@ function formatMatchDate(value) {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatHistoryDate(value) {
+  if (!value) return '--';
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
   }).format(new Date(value));
 }

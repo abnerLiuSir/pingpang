@@ -70,6 +70,15 @@ describe('api', () => {
     const players = await request(app, 'GET', '/api/players', undefined, token);
     const winner = players.data.players[0];
     const loser = players.data.players[1];
+    const winnerAvatarUrl = 'data:image/svg+xml;base64,d2lubmVy';
+    const loserAvatarUrl = 'data:image/svg+xml;base64,bG9zZXI=';
+
+    await request(app, 'PATCH', `/api/players/${winner.id}`, {
+      avatarUrl: winnerAvatarUrl,
+    }, token);
+    await request(app, 'PATCH', `/api/players/${loser.id}`, {
+      avatarUrl: loserAvatarUrl,
+    }, token);
 
     const preview = await request(app, 'POST', '/api/matches/preview', {
       winnerId: winner.id,
@@ -98,6 +107,35 @@ describe('api', () => {
     assert.equal(leaderboard.data.monthly[0].id, winner.id);
     assert.equal(leaderboard.data.monthly[0].ratingDelta, 17);
     assert.equal(leaderboard.data.recentMatches[0].score, '4:3');
+    assert.equal(leaderboard.data.recentMatches[0].winnerAvatarUrl, winnerAvatarUrl);
+    assert.equal(leaderboard.data.recentMatches[0].loserAvatarUrl, loserAvatarUrl);
+  });
+
+  it('returns only the five most recent matches on the public leaderboard', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+    const players = await request(app, 'GET', '/api/players', undefined, token);
+    const winner = players.data.players[0];
+    const loser = players.data.players[1];
+
+    for (let index = 0; index < 6; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: winner.id,
+        loserId: loser.id,
+        score: '3:1',
+        playedAt: `2026-06-${String(index + 10).padStart(2, '0')}`,
+        note: `recent-limit-${index}`,
+      }, token);
+    }
+
+    const leaderboard = await request(app, 'GET', '/api/leaderboard');
+
+    assert.equal(leaderboard.status, 200);
+    assert.equal(leaderboard.data.recentMatches.length, 5);
+    assert.deepEqual(
+      leaderboard.data.recentMatches.map((match) => match.note),
+      ['recent-limit-5', 'recent-limit-4', 'recent-limit-3', 'recent-limit-2', 'recent-limit-1'],
+    );
   });
 
   it('only reverts the most recent non-reverted match', async () => {
@@ -159,6 +197,28 @@ describe('api', () => {
     assert.equal(restored.data.player.isActive, true);
   });
 
+  it('accepts cropped avatar payloads without hitting the JSON body limit', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+    const avatarUrl = `data:image/jpeg;base64,${'a'.repeat(180_000)}`;
+
+    const created = await request(app, 'POST', '/api/players', {
+      name: 'Large Avatar Player',
+      avatarUrl,
+    }, token);
+
+    assert.equal(created.status, 201);
+    assert.equal(created.data.player.avatarUrl.length, avatarUrl.length);
+
+    const updatedAvatarUrl = `data:image/jpeg;base64,${'b'.repeat(220_000)}`;
+    const updated = await request(app, 'PATCH', `/api/players/${created.data.player.id}`, {
+      avatarUrl: updatedAvatarUrl,
+    }, token);
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.data.player.avatarUrl.length, updatedAvatarUrl.length);
+  });
+
   it('edits and soft-deletes matches, then recalculates ratings from match history', async () => {
     const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
     const token = login.data.token;
@@ -207,6 +267,76 @@ describe('api', () => {
     const matches = await request(app, 'GET', '/api/admin/matches', undefined, token);
     const deletedMatch = matches.data.matches.find((match) => match.id === second.data.match.id);
     assert.equal(deletedMatch.isReverted, true);
+  });
+
+  it('returns public player match history by scope and opponent', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const p1 = (await request(app, 'POST', '/api/players', { name: 'Public History One' }, token)).data.player;
+    const p2 = (await request(app, 'POST', '/api/players', { name: 'Public History Two' }, token)).data.player;
+    const p3 = (await request(app, 'POST', '/api/players', { name: 'Public History Three' }, token)).data.player;
+    const p4 = (await request(app, 'POST', '/api/players', { name: 'Public History Four' }, token)).data.player;
+
+    await request(app, 'POST', '/api/matches', {
+      winnerId: p1.id,
+      loserId: p2.id,
+      score: '3:1',
+      playedAt: '2026-06-01',
+      note: 'monthly win',
+    }, token);
+    await request(app, 'POST', '/api/matches', {
+      winnerId: p3.id,
+      loserId: p1.id,
+      score: '3:2',
+      playedAt: '2026-06-02',
+      note: 'monthly loss',
+    }, token);
+    await request(app, 'POST', '/api/matches', {
+      winnerId: p1.id,
+      loserId: p3.id,
+      score: '3:0',
+      playedAt: '2026-05-15',
+      note: 'older win',
+    }, token);
+    const reverted = await request(app, 'POST', '/api/matches', {
+      winnerId: p1.id,
+      loserId: p4.id,
+      score: '3:0',
+      playedAt: '2026-06-03',
+      note: 'deleted win',
+    }, token);
+    await request(app, 'DELETE', `/api/matches/${reverted.data.match.id}`, undefined, token);
+
+    const history = await request(app, 'GET', `/api/players/${p1.id}/matches?scope=all`);
+    assert.equal(history.status, 200);
+    assert.equal(history.data.player.id, p1.id);
+    assert.equal(history.data.scope, 'all');
+    assert.equal(history.data.summary.matches, 3);
+    assert.equal(history.data.summary.wins, 2);
+    assert.equal(history.data.summary.losses, 1);
+    assert.equal(history.data.summary.winRate, 67);
+    assert.equal(history.data.matches.some((match) => match.opponentId === p4.id), false);
+    assert.equal(history.data.opponents.some((opponent) => opponent.id === p2.id), true);
+    assert.equal(history.data.opponents.some((opponent) => opponent.id === p3.id), true);
+
+    const monthly = await request(app, 'GET', `/api/players/${p1.id}/matches?scope=month`);
+    assert.equal(monthly.status, 200);
+    assert.equal(monthly.data.scope, 'month');
+    assert.equal(monthly.data.summary.matches, 2);
+    assert.equal(monthly.data.matches.every((match) => match.playedAt.startsWith('2026-06')), true);
+
+    const filtered = await request(app, 'GET', `/api/players/${p1.id}/matches?scope=all&opponentId=${p3.id}`);
+    assert.equal(filtered.status, 200);
+    assert.equal(filtered.data.summary.matches, 2);
+    assert.equal(filtered.data.matches.every((match) => match.opponentId === p3.id), true);
+    assert.equal(filtered.data.opponents.some((opponent) => opponent.id === p2.id), true);
+
+    const invalidScope = await request(app, 'GET', `/api/players/${p1.id}/matches?scope=season`);
+    assert.equal(invalidScope.status, 400);
+
+    const missingPlayer = await request(app, 'GET', '/api/players/999999/matches?scope=all');
+    assert.equal(missingPlayer.status, 404);
   });
 
   it('allows editing historical matches for inactive players without allowing new inactive matches', async () => {
