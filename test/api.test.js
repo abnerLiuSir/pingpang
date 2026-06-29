@@ -70,6 +70,15 @@ describe('api', () => {
     const players = await request(app, 'GET', '/api/players', undefined, token);
     const winner = players.data.players[0];
     const loser = players.data.players[1];
+    const winnerAvatarUrl = 'data:image/svg+xml;base64,d2lubmVy';
+    const loserAvatarUrl = 'data:image/svg+xml;base64,bG9zZXI=';
+
+    await request(app, 'PATCH', `/api/players/${winner.id}`, {
+      avatarUrl: winnerAvatarUrl,
+    }, token);
+    await request(app, 'PATCH', `/api/players/${loser.id}`, {
+      avatarUrl: loserAvatarUrl,
+    }, token);
 
     const preview = await request(app, 'POST', '/api/matches/preview', {
       winnerId: winner.id,
@@ -98,6 +107,8 @@ describe('api', () => {
     assert.equal(leaderboard.data.monthly[0].id, winner.id);
     assert.equal(leaderboard.data.monthly[0].ratingDelta, 17);
     assert.equal(leaderboard.data.recentMatches[0].score, '4:3');
+    assert.equal(leaderboard.data.recentMatches[0].winnerAvatarUrl, winnerAvatarUrl);
+    assert.equal(leaderboard.data.recentMatches[0].loserAvatarUrl, loserAvatarUrl);
   });
 
   it('only reverts the most recent non-reverted match', async () => {

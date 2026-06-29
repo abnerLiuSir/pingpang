@@ -17,8 +17,10 @@ function rowToMatch(row) {
     score: row.score,
     winnerId: row.winner_id,
     winnerName: row.winner_name,
+    winnerAvatarUrl: row.winner_avatar_url || '',
     loserId: row.loser_id,
     loserName: row.loser_name,
+    loserAvatarUrl: row.loser_avatar_url || '',
     winnerRatingBefore: row.winner_rating_before,
     loserRatingBefore: row.loser_rating_before,
     winnerRatingAfter: row.winner_rating_after,
@@ -217,7 +219,9 @@ export function getMatch(db, id) {
     SELECT
       m.*,
       winner.name AS winner_name,
-      loser.name AS loser_name
+      winner.avatar_url AS winner_avatar_url,
+      loser.name AS loser_name,
+      loser.avatar_url AS loser_avatar_url
     FROM matches m
     JOIN players winner ON winner.id = m.winner_id
     JOIN players loser ON loser.id = m.loser_id
@@ -232,7 +236,9 @@ export function listRecentMatches(db, limit = 8) {
     SELECT
       m.*,
       winner.name AS winner_name,
-      loser.name AS loser_name
+      winner.avatar_url AS winner_avatar_url,
+      loser.name AS loser_name,
+      loser.avatar_url AS loser_avatar_url
     FROM matches m
     JOIN players winner ON winner.id = m.winner_id
     JOIN players loser ON loser.id = m.loser_id
@@ -247,7 +253,9 @@ export function listAllMatches(db, limit = 100) {
     SELECT
       m.*,
       winner.name AS winner_name,
-      loser.name AS loser_name
+      winner.avatar_url AS winner_avatar_url,
+      loser.name AS loser_name,
+      loser.avatar_url AS loser_avatar_url
     FROM matches m
     JOIN players winner ON winner.id = m.winner_id
     JOIN players loser ON loser.id = m.loser_id
@@ -261,7 +269,9 @@ export function getMostRecentActiveMatch(db) {
     SELECT
       m.*,
       winner.name AS winner_name,
-      loser.name AS loser_name
+      winner.avatar_url AS winner_avatar_url,
+      loser.name AS loser_name,
+      loser.avatar_url AS loser_avatar_url
     FROM matches m
     JOIN players winner ON winner.id = m.winner_id
     JOIN players loser ON loser.id = m.loser_id

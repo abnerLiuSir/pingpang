@@ -293,9 +293,9 @@ function RecentMatches({ matches }) {
               <span>{formatMatchDate(match.playedAt)}</span>
             </div>
             <div className="versus-row">
-              <PlayerBadge name={match.winnerName} winner />
+              <PlayerBadge player={{ name: match.winnerName, avatarUrl: match.winnerAvatarUrl }} winner />
               <strong>{match.score}</strong>
-              <PlayerBadge name={match.loserName} />
+              <PlayerBadge player={{ name: match.loserName, avatarUrl: match.loserAvatarUrl }} />
             </div>
           </div>
         </div>
@@ -304,11 +304,11 @@ function RecentMatches({ matches }) {
   );
 }
 
-function PlayerBadge({ name, winner }) {
+function PlayerBadge({ player, winner }) {
   return (
     <div className={winner ? 'player-badge winner' : 'player-badge'}>
-      <span>{name.charAt(0)}</span>
-      <strong title={name}>{name}</strong>
+      <PlayerAvatar player={player} className="badge-avatar" />
+      <strong title={player.name}>{player.name}</strong>
     </div>
   );
 }

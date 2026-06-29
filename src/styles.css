@@ -730,22 +730,24 @@ h2 {
   opacity: 1;
 }
 
-.player-badge span {
+.player-badge .badge-avatar {
   display: flex;
   width: 52px;
   height: 52px;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   border: 2px solid #e5e5e5;
   border-radius: 50%;
   background: var(--blue-soft);
   color: var(--blue);
   font-size: 18px;
   font-weight: 800;
+  object-fit: cover;
   box-shadow: var(--shadow-sm);
 }
 
-.player-badge.winner span {
+.player-badge.winner .badge-avatar {
   border-color: var(--green);
   box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.16), var(--shadow-sm);
 }
@@ -1206,7 +1208,8 @@ h2 {
 
 .avatar-preview img,
 .avatar,
-.small-avatar {
+.small-avatar,
+.badge-avatar {
   object-fit: cover;
 }
 
