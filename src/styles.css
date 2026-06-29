@@ -924,6 +924,11 @@ h2 {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.admin-grid > .players-panel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  container-type: inline-size;
+}
+
 .admin-grid > form.entry-panel,
 .admin-grid > .entry-panel > .manager-list {
   min-height: 0;
@@ -1138,6 +1143,9 @@ h2 {
 
 .player-create-form {
   grid-template-columns: 1fr;
+  align-content: start;
+  border-bottom: 1px solid #f5f5f5;
+  padding-bottom: 12px;
 }
 
 .manager-list {
@@ -1148,13 +1156,18 @@ h2 {
 
 .manager-row {
   display: grid;
-  grid-template-columns: 82px minmax(116px, 1fr) 54px 32px 54px;
+  grid-template-columns: 82px minmax(112px, 1fr) 52px 38px 58px;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
   border: 1px solid #e5e5e5;
   border-radius: 12px;
   background: #fff;
   padding: 8px;
+}
+
+.manager-name-input {
+  min-width: 0;
 }
 
 .avatar-uploader {
@@ -1282,7 +1295,8 @@ h2 {
   font-size: 14px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .small-button {
@@ -1290,7 +1304,50 @@ h2 {
   border: 1px solid #d4d4d4;
   background: #fff;
   color: #404040;
-  padding: 0 8px;
+  padding: 0 10px;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+@container (max-width: 390px) {
+  .players-panel .manager-row {
+    grid-template-columns: 82px minmax(0, 1fr) 52px 38px 58px;
+  }
+
+  .players-panel .manager-name-input {
+    min-width: 0;
+  }
+}
+
+@container (max-width: 340px) {
+  .players-panel .manager-row {
+    grid-template-columns: 82px minmax(0, 1fr) 52px;
+    grid-template-areas:
+      "avatar name rating"
+      "avatar save toggle";
+  }
+
+  .players-panel .avatar-uploader {
+    grid-area: avatar;
+  }
+
+  .players-panel .manager-name-input {
+    grid-area: name;
+  }
+
+  .players-panel .player-rating {
+    grid-area: rating;
+  }
+
+  .players-panel .icon-button {
+    grid-area: save;
+    justify-self: end;
+  }
+
+  .players-panel .small-button {
+    grid-area: toggle;
+    justify-self: stretch;
+  }
 }
 
 .match-manager {

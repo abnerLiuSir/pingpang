@@ -691,7 +691,7 @@ function AdminPage() {
           </button>
         </form>
 
-        <section className="entry-panel">
+        <section className="entry-panel players-panel">
           <PanelTitle label="Players" title="球员管理" icon={<Users size={18} aria-hidden="true" />} />
           <form className="player-create-form" onSubmit={addPlayer}>
             <label className="field-block">
