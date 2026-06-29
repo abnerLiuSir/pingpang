@@ -250,6 +250,7 @@ function PodiumPlayer({ player, place, level, showMonthly }) {
       <span className={showMonthly ? 'podium-points monthly' : 'podium-points'}>
         {showMonthly && displayValue > 0 ? `+${displayValue}` : displayValue} pts
       </span>
+      <FormDots form={player.recentForm || []} className="podium-form" />
       <div className="podium-step">
         {place === '1' ? <Trophy size={28} aria-hidden="true" /> : <Medal size={24} aria-hidden="true" />}
       </div>
@@ -944,10 +945,10 @@ function Delta({ value }) {
   );
 }
 
-function FormDots({ form }) {
-  if (!form.length) return <span className="muted-copy">--</span>;
+function FormDots({ form, className = '' }) {
+  if (!form.length) return <span className={className ? `muted-copy ${className}` : 'muted-copy'}>--</span>;
   return (
-    <span className="form-dots" aria-label={`近况 ${form.join(' ')}`}>
+    <span className={className ? `form-dots ${className}` : 'form-dots'} aria-label={`近况 ${form.join(' ')}`}>
       {form.map((item, index) => (
         <span key={`${item}-${index}`} className={item === 'W' ? 'win' : 'loss'}>{item}</span>
       ))}

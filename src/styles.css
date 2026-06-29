@@ -498,6 +498,20 @@ h2 {
   padding: 2px 12px;
 }
 
+.podium-form {
+  justify-content: center;
+  min-height: 22px;
+  margin-top: 8px;
+}
+
+.podium-form.muted-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #a3a3a3;
+  font-weight: 800;
+}
+
 .podium-step {
   display: flex;
   width: 100%;
@@ -1452,6 +1466,7 @@ h2 {
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
       "avatar name points"
+      "avatar form form"
       "avatar step step";
     column-gap: 12px;
     text-align: left;
@@ -1474,6 +1489,12 @@ h2 {
   .podium-points {
     grid-area: points;
     align-self: end;
+  }
+
+  .podium-form {
+    grid-area: form;
+    justify-content: flex-start;
+    margin-top: 6px;
   }
 
   .podium-step,
