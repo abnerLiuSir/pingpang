@@ -1010,6 +1010,84 @@ h2 {
   font-weight: 800;
 }
 
+.honor-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.honor-list {
+  display: grid;
+  gap: 12px;
+}
+
+.honor-card {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  border-top: 1px solid #f5f5f5;
+  padding-top: 12px;
+}
+
+.honor-card:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.honor-photo {
+  display: grid;
+  min-height: 88px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(234, 179, 8, 0.42);
+  border-radius: 12px;
+  background: #fef9c3;
+  color: #ca8a04;
+}
+
+.honor-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.honor-info {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 8px;
+}
+
+.honor-month {
+  color: #ca8a04;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.honor-player {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.honor-player strong {
+  overflow: hidden;
+  color: #404040;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.honor-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .delta {
   display: inline-flex;
   align-items: center;
@@ -2025,6 +2103,7 @@ h2 {
   .preview-box,
   .inline-form,
   .player-create-form,
+  .honor-card,
   .manager-row {
     grid-template-columns: 1fr;
   }

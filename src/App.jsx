@@ -201,6 +201,7 @@ function PublicHome() {
             </div>
             <RecentMatches matches={data.recentMatches} />
             <MonthlyPanel players={data.monthly} />
+            <MonthlyHonorBoard honors={data.monthlyHonors || []} />
           </aside>
         </section>
       )}
@@ -434,6 +435,47 @@ function MonthlyPanel({ players }) {
           <Delta value={player.ratingDelta} />
         </div>
       )) : <p className="muted-copy">本月还没有比赛记录。</p>}
+    </section>
+  );
+}
+
+function MonthlyHonorBoard({ honors }) {
+  return (
+    <section className="compact-panel honor-panel">
+      <div className="panel-heading compact">
+        <div>
+          <h2>月度荣誉榜</h2>
+        </div>
+        <Medal size={18} aria-hidden="true" />
+      </div>
+      {honors.length ? (
+        <div className="honor-list">
+          {honors.slice(0, 6).map((honor) => (
+            <article className="honor-card" key={honor.id}>
+              <div className="honor-photo">
+                {honor.photoUrl ? (
+                  <img src={honor.photoUrl} alt={`${formatHonorMonth(honor.month)} ${honor.playerName} 冠军照片`} loading="lazy" />
+                ) : (
+                  <Medal size={28} aria-hidden="true" />
+                )}
+              </div>
+              <div className="honor-info">
+                <span className="honor-month">{formatHonorMonth(honor.month)}</span>
+                <div className="honor-player">
+                  <PlayerAvatar player={{ name: honor.playerName, avatarUrl: honor.playerAvatarUrl }} className="small-avatar" />
+                  <strong title={honor.playerName}>{honor.playerName}</strong>
+                </div>
+                <div className="honor-meta">
+                  <Delta value={honor.ratingDelta} />
+                  <span>{honor.wins}胜{honor.losses}负</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="muted-copy">还没有已结算的月度荣誉。</p>
+      )}
     </section>
   );
 }
@@ -1336,4 +1378,10 @@ function formatHistoryDate(value) {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date(value));
+}
+
+function formatHonorMonth(value) {
+  if (!value) return '--';
+  const [year, month] = String(value).split('-');
+  return `${year}年${Number(month)}月`;
 }
