@@ -447,4 +447,43 @@ describe('api', () => {
     assert.equal(leaderboard.data.monthly.some((player) => player.id === champion.id), true);
     assert.equal(leaderboard.data.monthlyHonors.some((honor) => honor.playerId === champion.id && honor.month === '2026-06'), false);
   });
+
+  it('lets admins update and clear monthly honor photos', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const champion = (await request(app, 'POST', '/api/players', { name: 'Photo Honor Champion' }, token)).data.player;
+    const opponent = (await request(app, 'POST', '/api/players', { name: 'Photo Honor Opponent' }, token)).data.player;
+
+    await request(app, 'POST', '/api/matches', {
+      winnerId: champion.id,
+      loserId: opponent.id,
+      score: '3:0',
+      playedAt: '2026-04-12',
+    }, token);
+
+    const honors = await request(app, 'GET', '/api/admin/monthly-honors', undefined, token);
+    const honor = honors.data.monthlyHonors.find((entry) => entry.month === '2026-04');
+    const photoUrl = `data:image/jpeg;base64,${'c'.repeat(180_000)}`;
+
+    assert.equal(honors.status, 200);
+    assert.equal(honor.playerId, champion.id);
+
+    const updated = await request(app, 'PATCH', `/api/admin/monthly-honors/${honor.id}`, {
+      photoUrl,
+    }, token);
+
+    assert.equal(updated.status, 200);
+    assert.equal(updated.data.monthlyHonor.photoUrl, photoUrl);
+
+    const publicLeaderboard = await request(app, 'GET', '/api/leaderboard');
+    assert.equal(publicLeaderboard.data.monthlyHonors.find((entry) => entry.id === honor.id).photoUrl, photoUrl);
+
+    const cleared = await request(app, 'PATCH', `/api/admin/monthly-honors/${honor.id}`, {
+      photoUrl: '',
+    }, token);
+
+    assert.equal(cleared.status, 200);
+    assert.equal(cleared.data.monthlyHonor.photoUrl, '');
+  });
 });

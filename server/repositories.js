@@ -376,6 +376,28 @@ export function listMonthlyHonors(db, now = new Date()) {
   `).all().map(rowToMonthlyHonor);
 }
 
+export function updateMonthlyHonor(db, id, { photoUrl }) {
+  const existing = db.prepare('SELECT id FROM monthly_honors WHERE id = ?').get(Number(id));
+  if (!existing) {
+    return { valid: false, message: 'Monthly honor was not found.' };
+  }
+
+  db.prepare('UPDATE monthly_honors SET photo_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(String(photoUrl || '').trim(), Number(id));
+
+  const monthlyHonor = db.prepare(`
+    SELECT
+      h.*,
+      p.name AS player_name,
+      p.avatar_url AS player_avatar_url
+    FROM monthly_honors h
+    JOIN players p ON p.id = h.player_id
+    WHERE h.id = ?
+  `).get(Number(id));
+
+  return { valid: true, monthlyHonor: rowToMonthlyHonor(monthlyHonor) };
+}
+
 export function getLeaderboard(db, now = new Date()) {
   const longTerm = listLongTermLeaderboard(db);
   const monthPrefix = currentMonthPrefix(now);

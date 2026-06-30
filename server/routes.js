@@ -5,6 +5,7 @@ import {
   createMatch,
   getLeaderboard,
   getPlayerMatchHistory,
+  listMonthlyHonors,
   listAllMatches,
   listAllPlayers,
   listPlayers,
@@ -12,6 +13,7 @@ import {
   revertMostRecentMatch,
   softDeleteMatch,
   updateMatch,
+  updateMonthlyHonor,
   updatePlayer,
 } from './repositories.js';
 import { validateMatchInput } from './validation.js';
@@ -68,6 +70,23 @@ export function createRouter({ db, adminPassphrase }) {
 
   router.get('/admin/players', requireAdmin, (req, res) => {
     res.json({ players: listAllPlayers(db) });
+  });
+
+  router.get('/admin/monthly-honors', requireAdmin, (req, res) => {
+    res.json({ monthlyHonors: listMonthlyHonors(db) });
+  });
+
+  router.patch('/admin/monthly-honors/:id', requireAdmin, (req, res) => {
+    const result = updateMonthlyHonor(db, req.params.id, {
+      photoUrl: req.body?.photoUrl,
+    });
+
+    if (!result.valid) {
+      res.status(400).json({ message: result.message });
+      return;
+    }
+
+    res.json({ monthlyHonor: result.monthlyHonor });
   });
 
   router.post('/players', requireAdmin, (req, res) => {
