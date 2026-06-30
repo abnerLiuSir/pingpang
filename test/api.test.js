@@ -69,6 +69,7 @@ describe('api', () => {
     assert.equal(response.data.longTerm.length >= 6, true);
     assert.equal(response.data.longTerm[0].rating, 1500);
     assert.deepEqual(response.data.monthly, []);
+    assert.deepEqual(response.data.monthlyHonors, []);
     assert.deepEqual(response.data.recentMatches, []);
   });
 
@@ -393,5 +394,57 @@ describe('api', () => {
       playedAt: '2026-06-04',
     }, token);
     assert.equal(newInactiveMatch.status, 400);
+  });
+
+  it('automatically settles completed monthly champions without duplicating honors', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const champion = (await request(app, 'POST', '/api/players', { name: 'March Honor Champion' }, token)).data.player;
+    const opponent = (await request(app, 'POST', '/api/players', { name: 'March Honor Opponent' }, token)).data.player;
+
+    await request(app, 'POST', '/api/matches', {
+      winnerId: champion.id,
+      loserId: opponent.id,
+      score: '3:0',
+      playedAt: '2026-03-15',
+      note: 'settled month win',
+    }, token);
+
+    const first = await request(app, 'GET', '/api/leaderboard');
+    const second = await request(app, 'GET', '/api/leaderboard');
+    const marchHonors = first.data.monthlyHonors.filter((honor) => honor.month === '2026-03');
+
+    assert.equal(first.status, 200);
+    assert.equal(marchHonors.length, 1);
+    assert.equal(marchHonors[0].playerId, champion.id);
+    assert.equal(marchHonors[0].playerName, champion.name);
+    assert.equal(marchHonors[0].medal, 'gold');
+    assert.equal(marchHonors[0].wins, 1);
+    assert.equal(marchHonors[0].losses, 0);
+    assert.equal(marchHonors[0].matchCount, 1);
+    assert.equal(marchHonors[0].ratingDelta > 0, true);
+    assert.equal(second.data.monthlyHonors.filter((honor) => honor.month === '2026-03').length, 1);
+  });
+
+  it('does not settle the current month into monthly honors', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const champion = (await request(app, 'POST', '/api/players', { name: 'Current Honor Champion' }, token)).data.player;
+    const opponent = (await request(app, 'POST', '/api/players', { name: 'Current Honor Opponent' }, token)).data.player;
+
+    await request(app, 'POST', '/api/matches', {
+      winnerId: champion.id,
+      loserId: opponent.id,
+      score: '3:1',
+      playedAt: '2026-06-20',
+    }, token);
+
+    const leaderboard = await request(app, 'GET', '/api/leaderboard');
+
+    assert.equal(leaderboard.status, 200);
+    assert.equal(leaderboard.data.monthly.some((player) => player.id === champion.id), true);
+    assert.equal(leaderboard.data.monthlyHonors.some((honor) => honor.playerId === champion.id && honor.month === '2026-06'), false);
   });
 });

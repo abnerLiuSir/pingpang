@@ -33,6 +33,27 @@ function rowToMatch(row) {
   };
 }
 
+function rowToMonthlyHonor(row) {
+  return {
+    id: row.id,
+    month: row.month,
+    playerId: row.player_id,
+    playerName: row.player_name,
+    playerAvatarUrl: row.player_avatar_url || '',
+    ratingDelta: row.rating_delta,
+    wins: row.wins,
+    losses: row.losses,
+    matchCount: row.match_count,
+    medal: row.medal,
+    photoUrl: row.photo_url || '',
+    settledAt: row.settled_at,
+  };
+}
+
+function currentMonthPrefix(now) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function listPlayers(db) {
   return db
     .prepare('SELECT id, name, avatar_url, rating, is_active FROM players WHERE is_active = 1 ORDER BY name ASC')
@@ -305,10 +326,61 @@ export function revertMostRecentMatch(db, id) {
   return { valid: true, match: reverted };
 }
 
+export function settleMonthlyHonors(db, now = new Date()) {
+  const currentMonth = currentMonthPrefix(now);
+  const months = db.prepare(`
+    SELECT DISTINCT substr(played_at, 1, 7) AS month
+    FROM matches
+    WHERE is_reverted = 0
+      AND substr(played_at, 1, 7) < ?
+    ORDER BY month ASC
+  `).all(currentMonth);
+
+  const insertHonor = db.prepare(`
+    INSERT OR IGNORE INTO monthly_honors (
+      month,
+      player_id,
+      rating_delta,
+      wins,
+      losses,
+      match_count,
+      medal
+    ) VALUES (?, ?, ?, ?, ?, ?, 'gold')
+  `);
+
+  for (const { month } of months) {
+    const champion = listMonthlyLeaderboard(db, month)[0];
+    if (!champion) continue;
+
+    insertHonor.run(
+      month,
+      champion.id,
+      champion.ratingDelta,
+      champion.wins,
+      champion.losses,
+      champion.wins + champion.losses,
+    );
+  }
+}
+
+export function listMonthlyHonors(db, now = new Date()) {
+  settleMonthlyHonors(db, now);
+  return db.prepare(`
+    SELECT
+      h.*,
+      p.name AS player_name,
+      p.avatar_url AS player_avatar_url
+    FROM monthly_honors h
+    JOIN players p ON p.id = h.player_id
+    ORDER BY h.month DESC
+  `).all().map(rowToMonthlyHonor);
+}
+
 export function getLeaderboard(db, now = new Date()) {
   const longTerm = listLongTermLeaderboard(db);
-  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthPrefix = currentMonthPrefix(now);
   const monthly = listMonthlyLeaderboard(db, monthPrefix);
+  const monthlyHonors = listMonthlyHonors(db, now);
   const recentMatches = listRecentMatches(db);
   const totalMatches = db.prepare('SELECT COUNT(*) AS count FROM matches WHERE is_reverted = 0').get().count;
   const monthMatches = db
@@ -318,6 +390,7 @@ export function getLeaderboard(db, now = new Date()) {
   return {
     longTerm,
     monthly,
+    monthlyHonors,
     recentMatches,
     summary: {
       totalPlayers: longTerm.length,
@@ -376,7 +449,7 @@ export function getPlayerMatchHistory(db, playerId, { scope = 'all', opponentId 
 }
 
 function listPlayerHistoryMatches(db, playerId, scope, now) {
-  const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthPrefix = currentMonthPrefix(now);
   const monthFilter = scope === 'month' ? 'AND substr(m.played_at, 1, 7) = ?' : '';
   const params = scope === 'month' ? [playerId, playerId, monthPrefix] : [playerId, playerId];
 
