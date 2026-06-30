@@ -43,6 +43,20 @@ export function initializeDatabase(db) {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       reverted_at TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS monthly_honors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      month TEXT NOT NULL UNIQUE,
+      player_id INTEGER NOT NULL REFERENCES players(id),
+      rating_delta INTEGER NOT NULL,
+      wins INTEGER NOT NULL,
+      losses INTEGER NOT NULL,
+      match_count INTEGER NOT NULL,
+      medal TEXT NOT NULL DEFAULT 'gold',
+      photo_url TEXT NOT NULL DEFAULT '',
+      settled_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   const playerColumns = db.prepare("PRAGMA table_info(players)").all().map((column) => column.name);

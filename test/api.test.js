@@ -44,6 +44,24 @@ describe('api', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
+  it('initializes monthly honors storage', async () => {
+    const columns = db.prepare("PRAGMA table_info(monthly_honors)").all().map((column) => column.name);
+
+    assert.deepEqual(columns, [
+      'id',
+      'month',
+      'player_id',
+      'rating_delta',
+      'wins',
+      'losses',
+      'match_count',
+      'medal',
+      'photo_url',
+      'settled_at',
+      'updated_at',
+    ]);
+  });
+
   it('returns seeded leaderboard data', async () => {
     const response = await request(app, 'GET', '/api/leaderboard');
 
