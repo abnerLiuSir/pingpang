@@ -1,5 +1,10 @@
 import { calculateRatingChange } from './rating.js';
 
+const LONG_TERM_QUALIFICATION_MATCHES = 10;
+const MONTHLY_QUALIFICATION_MATCHES = 5;
+const LONG_TERM_PROVISIONAL_LABEL = '\u5b9a\u7ea7\u4e2d';
+const MONTHLY_PROVISIONAL_LABEL = '\u672c\u6708\u573a\u6b21\u4e0d\u8db3';
+
 function rowToPlayer(row) {
   return {
     id: row.id,
@@ -349,7 +354,7 @@ export function settleMonthlyHonors(db, now = new Date()) {
   `);
 
   for (const { month } of months) {
-    const champion = listMonthlyLeaderboard(db, month)[0];
+    const champion = listMonthlyLeaderboard(db, month).find((player) => player.isQualified);
     if (!champion) continue;
 
     insertHonor.run(
@@ -518,6 +523,10 @@ function listLongTermLeaderboard(db) {
       p.rating,
       SUM(CASE WHEN m.winner_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END) AS wins,
       SUM(CASE WHEN m.loser_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END) AS losses,
+      (
+        SUM(CASE WHEN m.winner_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN m.loser_id = p.id AND m.is_reverted = 0 THEN 1 ELSE 0 END)
+      ) AS match_count,
       COALESCE(SUM(CASE
         WHEN m.winner_id = p.id AND m.is_reverted = 0 THEN m.winner_delta
         WHEN m.loser_id = p.id AND m.is_reverted = 0 THEN m.loser_delta
@@ -527,13 +536,19 @@ function listLongTermLeaderboard(db) {
     LEFT JOIN matches m ON m.winner_id = p.id OR m.loser_id = p.id
     WHERE p.is_active = 1
     GROUP BY p.id
-    ORDER BY p.rating DESC, p.name ASC
-  `).all();
+    ORDER BY
+      CASE WHEN match_count > ? THEN 0 ELSE 1 END ASC,
+      p.rating DESC,
+      wins DESC,
+      p.name ASC
+  `).all(LONG_TERM_QUALIFICATION_MATCHES);
 
   return players.map((player, index) => {
     const wins = player.wins || 0;
     const losses = player.losses || 0;
     const total = wins + losses;
+    const matchCount = player.match_count || 0;
+    const isQualified = matchCount > LONG_TERM_QUALIFICATION_MATCHES;
     return {
       id: player.id,
       rank: index + 1,
@@ -544,6 +559,9 @@ function listLongTermLeaderboard(db) {
       losses,
       winRate: total ? Math.round((wins / total) * 100) : 0,
       ratingDelta: player.rating_delta || 0,
+      matchCount,
+      isQualified,
+      qualificationLabel: isQualified ? '' : LONG_TERM_PROVISIONAL_LABEL,
       recentForm: getRecentForm(db, player.id),
     };
   });
@@ -558,6 +576,10 @@ function listMonthlyLeaderboard(db, monthPrefix) {
       p.rating,
       SUM(CASE WHEN m.winner_id = p.id THEN 1 ELSE 0 END) AS wins,
       SUM(CASE WHEN m.loser_id = p.id THEN 1 ELSE 0 END) AS losses,
+      (
+        SUM(CASE WHEN m.winner_id = p.id THEN 1 ELSE 0 END) +
+        SUM(CASE WHEN m.loser_id = p.id THEN 1 ELSE 0 END)
+      ) AS match_count,
       SUM(CASE
         WHEN m.winner_id = p.id THEN m.winner_delta
         WHEN m.loser_id = p.id THEN m.loser_delta
@@ -569,11 +591,17 @@ function listMonthlyLeaderboard(db, monthPrefix) {
       AND m.is_reverted = 0
       AND substr(m.played_at, 1, 7) = ?
     GROUP BY p.id
-    ORDER BY rating_delta DESC, wins DESC, p.name ASC
-  `).all(monthPrefix).map((player, index) => {
+    ORDER BY
+      CASE WHEN match_count > ? THEN 0 ELSE 1 END ASC,
+      rating_delta DESC,
+      wins DESC,
+      p.name ASC
+  `).all(monthPrefix, MONTHLY_QUALIFICATION_MATCHES).map((player, index) => {
     const wins = player.wins || 0;
     const losses = player.losses || 0;
     const total = wins + losses;
+    const matchCount = player.match_count || 0;
+    const isQualified = matchCount > MONTHLY_QUALIFICATION_MATCHES;
     return {
       id: player.id,
       rank: index + 1,
@@ -584,6 +612,9 @@ function listMonthlyLeaderboard(db, monthPrefix) {
       losses,
       winRate: total ? Math.round((wins / total) * 100) : 0,
       ratingDelta: player.rating_delta || 0,
+      matchCount,
+      isQualified,
+      qualificationLabel: isQualified ? '' : MONTHLY_PROVISIONAL_LABEL,
     };
   });
 }

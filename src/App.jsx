@@ -5,7 +5,6 @@ import {
   ArrowUp,
   Calendar,
   Check,
-  Crown,
   Flame,
   Link2,
   Lock,
@@ -123,35 +122,42 @@ function PublicHome() {
   const topPlayer = activeRows[0];
 
   return (
-    <main className="page-shell">
-      <section className="stat-grid" aria-label="积分概览">
-        <StatCard
-          tone="blue"
-          label="总选手"
-          value={data?.summary?.totalPlayers ?? '--'}
-          suffix="人"
-          icon={<Users size={80} aria-hidden="true" />}
-        />
-        <StatCard
-          tone="indigo"
-          label="总比赛"
-          value={data?.summary?.totalMatches ?? '--'}
-          suffix="场"
-          icon={<Activity size={80} aria-hidden="true" />}
-        />
-        <StatCard
-          tone="orange"
-          label="本月热战"
-          value={data?.summary?.monthMatches ?? '--'}
-          suffix="场"
-          icon={<Flame size={80} aria-hidden="true" />}
-        />
-        <StatCard
-          tone="gold"
-          label="当前榜首"
-          value={topPlayer?.name || '-'}
-          icon={<Crown size={80} aria-hidden="true" />}
-        />
+    <main className="page-shell board-page">
+      <section className="board-hero" aria-label="积分白板">
+        <div className="board-hero-copy">
+          <span className="board-kicker">PingPang 积分榜</span>
+          <h1>看清排名、状态和本月表现</h1>
+          <p className="header-copy">记录办公室乒乓赛成绩，自动更新长期积分、月度涨幅和近期赛况。</p>
+        </div>
+        <section className="stat-grid" aria-label="积分概览">
+          <StatCard
+            tone="yellow"
+            label="总选手"
+            value={data?.summary?.totalPlayers ?? '--'}
+            suffix="人"
+            icon={<Users size={80} aria-hidden="true" />}
+          />
+          <StatCard
+            tone="teal"
+            label="总比赛"
+            value={data?.summary?.totalMatches ?? '--'}
+            suffix="场"
+            icon={<Activity size={80} aria-hidden="true" />}
+          />
+          <StatCard
+            tone="coral"
+            label="本月热战"
+            value={data?.summary?.monthMatches ?? '--'}
+            suffix="场"
+            icon={<Flame size={80} aria-hidden="true" />}
+          />
+          <StatCard
+            tone="rose"
+            label="当前榜首"
+            value={topPlayer?.name || '-'}
+            icon={<Trophy size={80} aria-hidden="true" />}
+          />
+        </section>
       </section>
 
       {status === 'loading' && <LeaderboardSkeleton />}
@@ -388,6 +394,10 @@ function TopThree({ players, mode, showMonthly }) {
   const [first, second, third] = players;
   return (
     <section className="podium-panel">
+      <div className="podium-heading">
+        <span>{showMonthly ? '本月领跑' : '当前领跑'}</span>
+        <strong>{showMonthly ? '按月度积分变化排序' : '按长期 Elo 积分排序'}</strong>
+      </div>
       <div className="podium">
         <PodiumPlayer player={second} place="2" level="second" mode={mode} showMonthly={showMonthly} />
         <PodiumPlayer player={first} place="1" level="first" mode={mode} showMonthly={showMonthly} />
@@ -402,12 +412,14 @@ function PodiumPlayer({ player, place, level, mode, showMonthly }) {
   const displayValue = showMonthly ? player.ratingDelta : player.rating;
   return (
     <a className={`podium-player ${level}`} href={playerHistoryHref(player.id, mode)} aria-label={`查看${player.name}战绩`}>
-      {place === '1' && <Crown className="podium-crown" size={32} aria-hidden="true" />}
       <div className="avatar-wrap">
         <PlayerAvatar player={player} className="avatar" />
         <span className="rank-mark">{place}</span>
       </div>
       <strong title={player.name}>{player.name}</strong>
+      {player.qualificationLabel && (
+        <span className="qualification-label">{player.qualificationLabel}</span>
+      )}
       <span className={showMonthly ? 'podium-points monthly' : 'podium-points'}>
         {showMonthly && displayValue > 0 ? `+${displayValue}` : displayValue} pts
       </span>
@@ -421,7 +433,7 @@ function PodiumPlayer({ player, place, level, mode, showMonthly }) {
 
 function MonthlyPanel({ players }) {
   return (
-    <section className="compact-panel">
+    <section className="compact-panel sticky-note teal-note">
       <div className="panel-heading compact">
         <div>
           <h2>月度风云</h2>
@@ -441,7 +453,7 @@ function MonthlyPanel({ players }) {
 
 function MonthlyHonorBoard({ honors }) {
   return (
-    <section className="compact-panel honor-panel">
+    <section className="compact-panel honor-panel sticky-note rose-note">
       <div className="panel-heading compact">
         <div>
           <h2>月度荣誉榜</h2>
@@ -540,6 +552,9 @@ function LeaderboardTable({ players, mode, showMonthly, startRank = 1 }) {
             <div>
               <strong>{player.name}</strong>
               <small>{player.wins}胜 {player.losses}负 · 胜率 {player.winRate}%</small>
+              {player.qualificationLabel && (
+                <span className="qualification-label">{player.qualificationLabel}</span>
+              )}
             </div>
           </div>
           <div className="rank-right">
@@ -568,11 +583,12 @@ function AdminPage() {
   const [activePlayers, setActivePlayers] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
   const [matches, setMatches] = useState([]);
-  const [leaderboard, setLeaderboard] = useState(null);
+  const [monthlyHonors, setMonthlyHonors] = useState([]);
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerAvatar, setNewPlayerAvatar] = useState('');
   const [playerDrafts, setPlayerDrafts] = useState({});
   const [playerAvatarDrafts, setPlayerAvatarDrafts] = useState({});
+  const [honorPhotoDrafts, setHonorPhotoDrafts] = useState({});
   const [editingMatchId, setEditingMatchId] = useState(null);
   const [matchDraft, setMatchDraft] = useState(null);
   const [form, setForm] = useState({
@@ -610,18 +626,19 @@ function AdminPage() {
     if (!activeToken) return;
     setFormError('');
     try {
-      const [activeResult, allResult, matchResult, leaderboardResult] = await Promise.all([
+      const [activeResult, allResult, matchResult, honorResult] = await Promise.all([
         apiRequest('/players', { token: activeToken }),
         apiRequest('/admin/players', { token: activeToken }),
         apiRequest('/admin/matches', { token: activeToken }),
-        apiRequest('/leaderboard'),
+        apiRequest('/admin/monthly-honors', { token: activeToken }),
       ]);
       setActivePlayers(activeResult.players);
       setAllPlayers(allResult.players);
       setMatches(matchResult.matches);
-      setLeaderboard(leaderboardResult);
+      setMonthlyHonors(honorResult.monthlyHonors);
       setPlayerDrafts(Object.fromEntries(allResult.players.map((player) => [player.id, player.name])));
       setPlayerAvatarDrafts(Object.fromEntries(allResult.players.map((player) => [player.id, player.avatarUrl || ''])));
+      setHonorPhotoDrafts(Object.fromEntries(honorResult.monthlyHonors.map((honor) => [honor.id, honor.photoUrl || ''])));
       setForm((current) => ({
         ...current,
         winnerId: current.winnerId || String(activeResult.players[0]?.id || ''),
@@ -814,6 +831,28 @@ function AdminPage() {
     }
   }
 
+  async function saveMonthlyHonorPhoto(honor) {
+    setBusy(true);
+    setFormError('');
+    setSuccess(null);
+    try {
+      const result = await apiRequest(`/admin/monthly-honors/${honor.id}`, {
+        method: 'PATCH',
+        token,
+        body: {
+          photoUrl: honorPhotoDrafts[honor.id] || '',
+        },
+      });
+      setMonthlyHonors((current) => current.map((entry) => (entry.id === honor.id ? result.monthlyHonor : entry)));
+      setHonorPhotoDrafts((current) => ({ ...current, [honor.id]: result.monthlyHonor.photoUrl || '' }));
+      setSuccess('月度荣誉照片已保存。');
+    } catch (error) {
+      setFormError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!token) {
     return (
       <main className="page-shell admin-shell">
@@ -988,7 +1027,46 @@ function AdminPage() {
           </div>
         )) : <EmptyState title="暂无比赛" body="提交第一场比赛后，会在这里管理比赛记录。" />}
       </section>
+
+      <MonthlyHonorManager
+        honors={monthlyHonors}
+        drafts={honorPhotoDrafts}
+        onDraftChange={(honorId, value) => setHonorPhotoDrafts((current) => ({ ...current, [honorId]: value }))}
+        onSave={saveMonthlyHonorPhoto}
+        busy={busy}
+      />
     </main>
+  );
+}
+
+function MonthlyHonorManager({ honors, drafts, onDraftChange, onSave, busy }) {
+  return (
+    <section className="entry-panel honor-manager">
+      <PanelTitle label="Honors" title="月度荣誉" icon={<Medal size={18} aria-hidden="true" />} />
+      {honors.length ? honors.map((honor) => (
+        <div className="honor-admin-row" key={honor.id}>
+          <div className="honor-admin-summary">
+            <span>{formatHonorMonth(honor.month)}</span>
+            <strong>{honor.playerName}</strong>
+            <small>{honor.wins}胜{honor.losses}负 · <Delta value={honor.ratingDelta} /></small>
+          </div>
+          <AvatarUploader
+            label="冠军照片"
+            value={drafts[honor.id] || ''}
+            name={honor.playerName}
+            uploadText="上传照片"
+            emptyText="照"
+            onChange={(value) => onDraftChange(honor.id, value)}
+          />
+          <button className="secondary-button" onClick={() => onSave(honor)} disabled={busy}>
+            <Save size={15} aria-hidden="true" />
+            保存照片
+          </button>
+        </div>
+      )) : (
+        <EmptyState title="暂无月度荣誉" body="有已结束月份的比赛后，系统会自动生成月度冠军。" />
+      )}
+    </section>
   );
 }
 
@@ -1004,7 +1082,7 @@ function PanelTitle({ label, title, icon }) {
   );
 }
 
-function AvatarUploader({ label, value, name, onChange }) {
+function AvatarUploader({ label, value, name, uploadText = '上传头像', emptyText = '球', onChange }) {
   const [urlValue, setUrlValue] = useState('');
   const [cropSource, setCropSource] = useState('');
 
@@ -1046,12 +1124,12 @@ function AvatarUploader({ label, value, name, onChange }) {
       {label && <span className="avatar-uploader-label">{label}</span>}
       <div className="avatar-edit-row">
         <div className="avatar-preview">
-          {value ? <img src={value} alt={`${name || '球员'} 头像预览`} /> : <span>{(name || '球').charAt(0)}</span>}
+          {value ? <img src={value} alt={`${name || '球员'} 图片预览`} /> : <span>{(name || emptyText).charAt(0)}</span>}
         </div>
         <div className="avatar-actions">
           <label className="avatar-upload-button">
             <Upload size={15} aria-hidden="true" />
-            上传头像
+            {uploadText}
             <input type="file" accept="image/*" onChange={handleFileChange} />
           </label>
           {value && (
@@ -1088,11 +1166,13 @@ function AvatarUploader({ label, value, name, onChange }) {
 
 function AvatarCropModal({ source, onCancel, onConfirm }) {
   const canvasRef = useRef(null);
+  const dragRef = useRef(null);
   const [image, setImage] = useState(null);
   const [error, setError] = useState('');
   const [scale, setScale] = useState(1.2);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1124,6 +1204,31 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
     drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY });
   }, [image, offsetX, offsetY, scale]);
 
+  function startDrag(event) {
+    if (!image) return;
+    const point = pointerPoint(event);
+    dragRef.current = {
+      startX: point.x,
+      startY: point.y,
+      offsetX,
+      offsetY,
+    };
+    setIsDragging(true);
+  }
+
+  function moveDrag(event) {
+    if (!dragRef.current) return;
+    event.preventDefault();
+    const point = pointerPoint(event);
+    setOffsetX(dragRef.current.offsetX + point.x - dragRef.current.startX);
+    setOffsetY(dragRef.current.offsetY + point.y - dragRef.current.startY);
+  }
+
+  function endDrag() {
+    dragRef.current = null;
+    setIsDragging(false);
+  }
+
   function handleConfirm() {
     const canvas = canvasRef.current;
     if (!canvas || !image) return;
@@ -1148,10 +1253,21 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
           </button>
         </div>
 
-        <div className="avatar-crop-stage">
+        <div
+          className={isDragging ? 'avatar-crop-stage dragging' : 'avatar-crop-stage'}
+          onMouseDown={startDrag}
+          onMouseMove={moveDrag}
+          onMouseUp={endDrag}
+          onMouseLeave={endDrag}
+          onTouchStart={startDrag}
+          onTouchMove={moveDrag}
+          onTouchEnd={endDrag}
+          onTouchCancel={endDrag}
+        >
           <canvas ref={canvasRef} width="160" height="160" aria-label="头像裁剪预览" />
           <span className="avatar-crop-ring" aria-hidden="true" />
         </div>
+        <p className="avatar-crop-hint">拖动图片调整位置，使用滑杆缩放。</p>
 
         {error && <p className="form-error">{error}</p>}
 
@@ -1159,14 +1275,6 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
           <label>
             <span>缩放</span>
             <input type="range" min="1" max="3" step="0.05" value={scale} onChange={(event) => setScale(Number(event.target.value))} disabled={!image} />
-          </label>
-          <label>
-            <span>左右</span>
-            <input type="range" min="-100" max="100" step="1" value={offsetX} onChange={(event) => setOffsetX(Number(event.target.value))} disabled={!image} />
-          </label>
-          <label>
-            <span>上下</span>
-            <input type="range" min="-100" max="100" step="1" value={offsetY} onChange={(event) => setOffsetY(Number(event.target.value))} disabled={!image} />
           </label>
         </div>
 
@@ -1181,6 +1289,11 @@ function AvatarCropModal({ source, onCancel, onConfirm }) {
       </div>
     </div>
   );
+}
+
+function pointerPoint(event) {
+  const point = event.touches?.[0] || event.changedTouches?.[0] || event;
+  return { x: point.clientX, y: point.clientY };
 }
 
 function drawCroppedAvatar(canvas, image, { scale, offsetX, offsetY }) {

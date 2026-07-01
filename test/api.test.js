@@ -28,6 +28,15 @@ async function request(app, method, url, body, token) {
   }
 }
 
+function currentMonthDate(day = 20) {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function currentMonthPrefix() {
+  return currentMonthDate().slice(0, 7);
+}
+
 describe('api', () => {
   let tempDir;
   let db;
@@ -112,7 +121,7 @@ describe('api', () => {
       winnerId: winner.id,
       loserId: loser.id,
       score: '4:3',
-      playedAt: '2026-06-26',
+      playedAt: currentMonthDate(20),
       note: '午休赛',
     }, token);
 
@@ -142,7 +151,7 @@ describe('api', () => {
         winnerId: winner.id,
         loserId: loser.id,
         score: '3:1',
-        playedAt: `2026-06-${String(index + 10).padStart(2, '0')}`,
+        playedAt: currentMonthDate(index + 10),
         note: `recent-limit-${index}`,
       }, token);
     }
@@ -168,7 +177,7 @@ describe('api', () => {
       winnerId: winner.id,
       loserId: loser.id,
       score: '3:0',
-      playedAt: '2026-06-26',
+      playedAt: currentMonthDate(21),
     }, token);
 
     const reverted = await request(app, 'POST', `/api/matches/${created.data.match.id}/revert`, undefined, token);
@@ -250,20 +259,20 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p2.id,
       score: '3:0',
-      playedAt: '2026-06-01',
+      playedAt: currentMonthDate(1),
     }, token);
     const second = await request(app, 'POST', '/api/matches', {
       winnerId: p2.id,
       loserId: p3.id,
       score: '3:1',
-      playedAt: '2026-06-02',
+      playedAt: currentMonthDate(2),
     }, token);
 
     const edited = await request(app, 'PATCH', `/api/matches/${first.data.match.id}`, {
       winnerId: p2.id,
       loserId: p1.id,
       score: '3:2',
-      playedAt: '2026-06-01',
+      playedAt: currentMonthDate(1),
       note: 'corrected winner',
     }, token);
     assert.equal(edited.status, 200);
@@ -301,14 +310,14 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p2.id,
       score: '3:1',
-      playedAt: '2026-06-01',
+      playedAt: currentMonthDate(1),
       note: 'monthly win',
     }, token);
     await request(app, 'POST', '/api/matches', {
       winnerId: p3.id,
       loserId: p1.id,
       score: '3:2',
-      playedAt: '2026-06-02',
+      playedAt: currentMonthDate(2),
       note: 'monthly loss',
     }, token);
     await request(app, 'POST', '/api/matches', {
@@ -322,7 +331,7 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p4.id,
       score: '3:0',
-      playedAt: '2026-06-03',
+      playedAt: currentMonthDate(3),
       note: 'deleted win',
     }, token);
     await request(app, 'DELETE', `/api/matches/${reverted.data.match.id}`, undefined, token);
@@ -343,7 +352,7 @@ describe('api', () => {
     assert.equal(monthly.status, 200);
     assert.equal(monthly.data.scope, 'month');
     assert.equal(monthly.data.summary.matches, 2);
-    assert.equal(monthly.data.matches.every((match) => match.playedAt.startsWith('2026-06')), true);
+    assert.equal(monthly.data.matches.every((match) => match.playedAt.startsWith(currentMonthPrefix())), true);
 
     const filtered = await request(app, 'GET', `/api/players/${p1.id}/matches?scope=all&opponentId=${p3.id}`);
     assert.equal(filtered.status, 200);
@@ -369,7 +378,7 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p2.id,
       score: '3:1',
-      playedAt: '2026-06-03',
+      playedAt: currentMonthDate(3),
     }, token);
     assert.equal(created.status, 201);
 
@@ -381,7 +390,7 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p2.id,
       score: '3:2',
-      playedAt: '2026-06-03',
+      playedAt: currentMonthDate(3),
       note: 'edited after player left',
     }, token);
     assert.equal(edited.status, 200);
@@ -391,7 +400,7 @@ describe('api', () => {
       winnerId: p1.id,
       loserId: p2.id,
       score: '3:0',
-      playedAt: '2026-06-04',
+      playedAt: currentMonthDate(4),
     }, token);
     assert.equal(newInactiveMatch.status, 400);
   });
@@ -403,13 +412,15 @@ describe('api', () => {
     const champion = (await request(app, 'POST', '/api/players', { name: 'March Honor Champion' }, token)).data.player;
     const opponent = (await request(app, 'POST', '/api/players', { name: 'March Honor Opponent' }, token)).data.player;
 
-    await request(app, 'POST', '/api/matches', {
-      winnerId: champion.id,
-      loserId: opponent.id,
-      score: '3:0',
-      playedAt: '2026-03-15',
-      note: 'settled month win',
-    }, token);
+    for (let index = 0; index < 6; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: champion.id,
+        loserId: opponent.id,
+        score: '3:0',
+        playedAt: `2026-03-${String(10 + index).padStart(2, '0')}`,
+        note: 'settled month win',
+      }, token);
+    }
 
     const first = await request(app, 'GET', '/api/leaderboard');
     const second = await request(app, 'GET', '/api/leaderboard');
@@ -420,9 +431,9 @@ describe('api', () => {
     assert.equal(marchHonors[0].playerId, champion.id);
     assert.equal(marchHonors[0].playerName, champion.name);
     assert.equal(marchHonors[0].medal, 'gold');
-    assert.equal(marchHonors[0].wins, 1);
+    assert.equal(marchHonors[0].wins, 6);
     assert.equal(marchHonors[0].losses, 0);
-    assert.equal(marchHonors[0].matchCount, 1);
+    assert.equal(marchHonors[0].matchCount, 6);
     assert.equal(marchHonors[0].ratingDelta > 0, true);
     assert.equal(second.data.monthlyHonors.filter((honor) => honor.month === '2026-03').length, 1);
   });
@@ -438,14 +449,14 @@ describe('api', () => {
       winnerId: champion.id,
       loserId: opponent.id,
       score: '3:1',
-      playedAt: '2026-06-20',
+      playedAt: currentMonthDate(20),
     }, token);
 
     const leaderboard = await request(app, 'GET', '/api/leaderboard');
 
     assert.equal(leaderboard.status, 200);
     assert.equal(leaderboard.data.monthly.some((player) => player.id === champion.id), true);
-    assert.equal(leaderboard.data.monthlyHonors.some((honor) => honor.playerId === champion.id && honor.month === '2026-06'), false);
+    assert.equal(leaderboard.data.monthlyHonors.some((honor) => honor.playerId === champion.id && honor.month === currentMonthPrefix()), false);
   });
 
   it('lets admins update and clear monthly honor photos', async () => {
@@ -455,12 +466,14 @@ describe('api', () => {
     const champion = (await request(app, 'POST', '/api/players', { name: 'Photo Honor Champion' }, token)).data.player;
     const opponent = (await request(app, 'POST', '/api/players', { name: 'Photo Honor Opponent' }, token)).data.player;
 
-    await request(app, 'POST', '/api/matches', {
-      winnerId: champion.id,
-      loserId: opponent.id,
-      score: '3:0',
-      playedAt: '2026-04-12',
-    }, token);
+    for (let index = 0; index < 6; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: champion.id,
+        loserId: opponent.id,
+        score: '3:0',
+        playedAt: `2026-04-${String(10 + index).padStart(2, '0')}`,
+      }, token);
+    }
 
     const honors = await request(app, 'GET', '/api/admin/monthly-honors', undefined, token);
     const honor = honors.data.monthlyHonors.find((entry) => entry.month === '2026-04');
@@ -485,5 +498,111 @@ describe('api', () => {
 
     assert.equal(cleared.status, 200);
     assert.equal(cleared.data.monthlyHonor.photoUrl, '');
+  });
+
+  it('keeps low-activity players visible but below qualified long-term players', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const provisional = (await request(app, 'POST', '/api/players', { name: 'Qualification Provisional' }, token)).data.player;
+    const provisionalOpponent = (await request(app, 'POST', '/api/players', { name: 'Qualification Provisional Opponent' }, token)).data.player;
+    const qualified = (await request(app, 'POST', '/api/players', { name: 'Qualification Qualified' }, token)).data.player;
+    const qualifiedOpponent = (await request(app, 'POST', '/api/players', { name: 'Qualification Qualified Opponent' }, token)).data.player;
+
+    await request(app, 'POST', '/api/matches', {
+      winnerId: provisional.id,
+      loserId: provisionalOpponent.id,
+      score: '3:0',
+      playedAt: currentMonthDate(5),
+    }, token);
+
+    for (let index = 0; index < 11; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: index % 2 === 0 ? qualified.id : qualifiedOpponent.id,
+        loserId: index % 2 === 0 ? qualifiedOpponent.id : qualified.id,
+        score: '3:2',
+        playedAt: currentMonthDate(6 + index),
+      }, token);
+    }
+
+    const leaderboard = await request(app, 'GET', '/api/leaderboard');
+    const provisionalRow = leaderboard.data.longTerm.find((player) => player.id === provisional.id);
+    const qualifiedRow = leaderboard.data.longTerm.find((player) => player.id === qualified.id);
+    const provisionalIndex = leaderboard.data.longTerm.findIndex((player) => player.id === provisional.id);
+    const qualifiedIndex = leaderboard.data.longTerm.findIndex((player) => player.id === qualified.id);
+
+    assert.equal(provisionalRow.matchCount, 1);
+    assert.equal(provisionalRow.isQualified, false);
+    assert.equal(provisionalRow.qualificationLabel, '\u5b9a\u7ea7\u4e2d');
+    assert.equal(qualifiedRow.matchCount, 11);
+    assert.equal(qualifiedRow.isQualified, true);
+    assert.equal(qualifiedRow.qualificationLabel, '');
+    assert.equal(provisionalRow.rating > qualifiedRow.rating, true);
+    assert.equal(qualifiedIndex < provisionalIndex, true);
+  });
+
+  it('keeps monthly players with five matches provisional and qualifies them after six', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const fiveMatchPlayer = (await request(app, 'POST', '/api/players', { name: 'Monthly Five Match Player' }, token)).data.player;
+    const fiveMatchOpponent = (await request(app, 'POST', '/api/players', { name: 'Monthly Five Match Opponent' }, token)).data.player;
+    const sixMatchPlayer = (await request(app, 'POST', '/api/players', { name: 'Monthly Six Match Player' }, token)).data.player;
+    const sixMatchOpponent = (await request(app, 'POST', '/api/players', { name: 'Monthly Six Match Opponent' }, token)).data.player;
+
+    for (let index = 0; index < 5; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: fiveMatchPlayer.id,
+        loserId: fiveMatchOpponent.id,
+        score: '3:0',
+        playedAt: currentMonthDate(1 + index),
+      }, token);
+    }
+
+    for (let index = 0; index < 6; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: index % 2 === 0 ? sixMatchPlayer.id : sixMatchOpponent.id,
+        loserId: index % 2 === 0 ? sixMatchOpponent.id : sixMatchPlayer.id,
+        score: '3:2',
+        playedAt: currentMonthDate(10 + index),
+      }, token);
+    }
+
+    const leaderboard = await request(app, 'GET', '/api/leaderboard');
+    const fiveMatchRow = leaderboard.data.monthly.find((player) => player.id === fiveMatchPlayer.id);
+    const sixMatchRow = leaderboard.data.monthly.find((player) => player.id === sixMatchPlayer.id);
+    const fiveMatchIndex = leaderboard.data.monthly.findIndex((player) => player.id === fiveMatchPlayer.id);
+    const sixMatchIndex = leaderboard.data.monthly.findIndex((player) => player.id === sixMatchPlayer.id);
+
+    assert.equal(fiveMatchRow.matchCount, 5);
+    assert.equal(fiveMatchRow.isQualified, false);
+    assert.equal(fiveMatchRow.qualificationLabel, '\u672c\u6708\u573a\u6b21\u4e0d\u8db3');
+    assert.equal(sixMatchRow.matchCount, 6);
+    assert.equal(sixMatchRow.isQualified, true);
+    assert.equal(sixMatchRow.qualificationLabel, '');
+    assert.equal(fiveMatchRow.ratingDelta > sixMatchRow.ratingDelta, true);
+    assert.equal(sixMatchIndex < fiveMatchIndex, true);
+  });
+
+  it('does not settle a monthly honor when the completed month has no qualified player', async () => {
+    const login = await request(app, 'POST', '/api/admin/login', { passphrase: 'score-keeper' });
+    const token = login.data.token;
+
+    const leader = (await request(app, 'POST', '/api/players', { name: 'Unqualified Honor Leader' }, token)).data.player;
+    const opponent = (await request(app, 'POST', '/api/players', { name: 'Unqualified Honor Opponent' }, token)).data.player;
+
+    for (let index = 0; index < 5; index += 1) {
+      await request(app, 'POST', '/api/matches', {
+        winnerId: leader.id,
+        loserId: opponent.id,
+        score: '3:0',
+        playedAt: `2026-02-${String(10 + index).padStart(2, '0')}`,
+      }, token);
+    }
+
+    const leaderboard = await request(app, 'GET', '/api/leaderboard');
+
+    assert.equal(leaderboard.status, 200);
+    assert.equal(leaderboard.data.monthlyHonors.some((honor) => honor.month === '2026-02'), false);
   });
 });
